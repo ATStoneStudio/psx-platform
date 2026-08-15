@@ -25,3 +25,4 @@ Setups with R:R < 1:2 are flagged invalid (project rule).
 ## Honest limitations (v1)
 No intraday timeframes (4H/1H/15M), no fundamentals (phase 2), no news sentiment.
 All output is probabilistic technical analysis, not investment advice.
+# psx-platform
