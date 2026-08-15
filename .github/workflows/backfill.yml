@@ -1,0 +1,25 @@
+name: One-time 5yr backfill
+on:
+  workflow_dispatch: {}   # manual button only, never scheduled
+
+permissions:
+  contents: write
+
+jobs:
+  backfill:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install pandas numpy psxdata
+      - run: python backfill.py --years 5
+      - name: Commit database
+        run: |
+          git config user.name "psx-bot"
+          git config user.email "bot@users.noreply.github.com"
+          git add data/psx.sqlite failed_symbols.txt || true
+          git commit -m "5yr backfill" || echo "no changes"
+          git push
