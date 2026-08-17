@@ -8,13 +8,13 @@ PSO
 SNGP
 SSGC
 APL
-SHEL
+WAFI  # Shell Pakistan -> Wafi Energy
 HUBC
 KEL
 KAPCO
 NPL
 NCPL
-LALPIR
+LPL  # Lalpir Power ticker
 PKGP
 LUCK
 DGKC
@@ -25,15 +25,15 @@ CHCC
 PIOC
 ACPL
 GWLC
-ENGRO
+ENGROH  # Engro Corp -> Engro Holdings
 EFERT
 FFC
 FATIMA
 EPCL
 LOTCHEM
-ICI
+LCI  # ICI renamed Lucky Core Industries
 COLG
-DAWH
+# DAWH delisted (merged)
 HBL
 UBL
 MCB
@@ -57,7 +57,7 @@ TELE
 AIRLINK
 INDU
 HCAR
-PSMC
+# PSMC delisted 2024
 MTL
 AGTL
 THALL
@@ -72,7 +72,7 @@ NCL
 GATM
 ILP
 KTML
-EFOODS
+FCEPL  # renamed FrieslandCampina Engro
 UNITY
 NATF
 FFL
@@ -96,4 +96,3 @@ PIBTL
 HGFA
 MEHT
 YOUW
-

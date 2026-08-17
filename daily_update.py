@@ -34,21 +34,48 @@ def fetch_eod(symbols):
     print(f"EOD fetch: {ok}/{len(symbols)} symbols updated")
 
 
-def fetch_macro():
-    """Brent, USD/PKR, KSE-100 index from stooq CSV (browser UA required)."""
+def _stooq(code):
     import io, urllib.request
+    req = urllib.request.Request(f"https://stooq.com/q/d/l/?s={code}&i=d", headers=UA)
+    df = pd.read_csv(io.StringIO(urllib.request.urlopen(req, timeout=30).read().decode())).tail(10)
+    return [(str(r.Date), float(r.Close)) for r in df.itertuples()]
+
+
+def _yahoo(code):
+    import urllib.request
+    req = urllib.request.Request(
+        f"https://query1.finance.yahoo.com/v8/finance/chart/{code}?range=1mo&interval=1d",
+        headers=UA)
+    j = json.loads(urllib.request.urlopen(req, timeout=30).read())["chart"]["result"][0]
+    closes = j["indicators"]["quote"][0]["close"]
+    return [(str(pd.Timestamp(ts, unit="s").date()), float(c))
+            for ts, c in zip(j["timestamp"], closes) if c is not None][-10:]
+
+
+def _psx_index(code="KSE100"):
+    import urllib.request
+    req = urllib.request.Request(f"https://dps.psx.com.pk/timeseries/eod/{code}", headers=UA)
+    j = json.loads(urllib.request.urlopen(req, timeout=30).read())
+    return sorted((str(pd.Timestamp(r[0], unit="s").date()), float(r[3]))
+                  for r in j["data"])[-10:]
+
+
+def fetch_macro():
+    """Each series tries multiple sources; failure of one never blocks the rest."""
     con = sqlite3.connect(DB)
-    for name, code in {"brent": "cb.f", "usdpkr": "usdpkr", "kse100": "^kse"}.items():
-        try:
-            req = urllib.request.Request(f"https://stooq.com/q/d/l/?s={code}&i=d", headers=UA)
-            csv = urllib.request.urlopen(req, timeout=30).read().decode()
-            df = pd.read_csv(io.StringIO(csv)).tail(10)
-            rows = [(name, str(r.Date), float(r.Close)) for r in df.itertuples()]
-            con.executemany("INSERT OR REPLACE INTO macro VALUES (?,?,?)", rows)
-            con.commit()
-            print(f"macro {name}: ok ({len(rows)} rows, last={rows[-1][1]} {rows[-1][2]})")
-        except Exception as e:
-            print(f"macro {name}: failed — {e}", file=sys.stderr)
+    plans = {"brent": [lambda: _stooq("cb.f"), lambda: _yahoo("BZ=F")],
+             "usdpkr": [lambda: _stooq("usdpkr"), lambda: _yahoo("PKR=X")],
+             "kse100": [lambda: _psx_index("KSE100"), lambda: _stooq("^kse")]}
+    for name, sources in plans.items():
+        for fn in sources:
+            try:
+                rows = [(name, d, v) for d, v in fn()]
+                con.executemany("INSERT OR REPLACE INTO macro VALUES (?,?,?)", rows)
+                con.commit()
+                print(f"macro {name}: ok (last={rows[-1][1]} {rows[-1][2]})")
+                break
+            except Exception as e:
+                print(f"macro {name}: source failed — {e}", file=sys.stderr)
 
 
 def run_engine():
@@ -56,6 +83,17 @@ def run_engine():
     symbols = [r[0] for r in con.execute(
         "SELECT DISTINCT symbol FROM ohlcv WHERE date LIKE '____-__-__'")]
     OUT.mkdir(exist_ok=True)
+    # exclude symbols with no fresh data (renamed/delisted/suspended) — a stale
+    # quote presented as current is worse for a trader than no quote at all
+    max_date = con.execute("SELECT MAX(date) FROM ohlcv WHERE date LIKE '____-__-__'").fetchone()[0]
+    stale = dict(con.execute(
+        "SELECT symbol, MAX(date) m FROM ohlcv GROUP BY symbol HAVING m < date(?, '-10 day')",
+        (max_date,)).fetchall())
+    if stale:
+        print(f"excluding {len(stale)} stale symbols (last data too old): {stale}")
+        symbols = [s for s in symbols if s not in stale]
+        for s in stale:  # remove any previously published analysis
+            (OUT / f"{s}.json").unlink(missing_ok=True)
     summary, first_error = [], True
     for sym in symbols:
         try:
@@ -82,15 +120,16 @@ def run_engine():
                 first_error = False
     summary.sort(key=lambda x: -x["score"])
     (OUT / "summary.json").write_text(json.dumps(
-        {"generated": str(date.today()), "stocks": summary}, default=str))
+        {"generated": str(date.today()), "stocks": summary,
+         "excluded_stale": stale}, default=str))
     print(f"Engine done: {len(summary)}/{len(symbols)} stocks analyzed.")
     if not summary:
         sys.exit(1)  # fail the workflow loudly instead of committing empty output
 
 
 if __name__ == "__main__":
-    symbols = [s.strip().upper() for s in (ROOT / "kse100.txt").read_text().splitlines()
-               if s.strip() and not s.startswith("#")]
+    symbols = [s.split("#")[0].strip().upper() for s in (ROOT / "kse100.txt").read_text().splitlines()
+               if s.split("#")[0].strip()]
     fetch_eod(symbols)
     fetch_macro()
     run_engine()

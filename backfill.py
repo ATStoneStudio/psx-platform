@@ -34,8 +34,8 @@ def main():
 
     import psxdata  # pip install psxdata
 
-    symbols = [s.strip().upper() for s in Path(args.symbols_file).read_text().splitlines()
-               if s.strip() and not s.startswith("#")]
+    symbols = [s.split("#")[0].strip().upper() for s in Path(args.symbols_file).read_text().splitlines()
+               if s.split("#")[0].strip()]
     start = date.today() - timedelta(days=args.years * 365)
     end = date.today()
 
