@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="en"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>PSX Edge — Analysis</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#070b14;--card:#101828;--card2:#141d30;--line:#1e2a44;--tx:#e6ecf7;--tx2:#8b98b8;--tx3:#5a6a8f;
+--up:#10d98e;--dn:#ff5470;--hold:#f5b950;--acc:#4f7cff;--grad:linear-gradient(135deg,#4f7cff,#8a5cff 55%,#c44dff)}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--tx);font:15px/1.55 Inter,system-ui,sans-serif}
+a{color:inherit;text-decoration:none}.mono{font-family:'JetBrains Mono',monospace}
+.wrap{max-width:1140px;margin:0 auto;padding:0 24px}
+header{position:sticky;top:0;z-index:50;backdrop-filter:blur(14px);background:rgba(7,11,20,.75);border-bottom:1px solid var(--line)}
+.nav{display:flex;align-items:center;gap:14px;height:62px}
+.logo{font-weight:800;font-size:17px}.logo .g{background:var(--grad);-webkit-background-clip:text;background-clip:text;color:transparent}
+.back{color:var(--tx2);font-size:13px;border:1px solid var(--line);border-radius:99px;padding:6px 14px}
+.back:hover{color:var(--tx)}
+.head{display:flex;flex-wrap:wrap;align-items:flex-end;gap:18px;padding:34px 0 8px}
+.head h1{font-size:38px;font-weight:800;letter-spacing:-.02em}
+.head .px{font-size:26px;font-weight:700}
+.verdict{font-size:13px;font-weight:700;padding:8px 18px;border-radius:99px}
+.v-up{background:rgba(16,217,142,.14);color:var(--up)}.v-h{background:rgba(245,185,80,.12);color:var(--hold)}.v-dn{background:rgba(255,84,112,.13);color:var(--dn)}
+.sub{color:var(--tx3);font-size:13px;padding-bottom:18px}
+.cols{display:grid;grid-template-columns:1fr 360px;gap:16px;padding-bottom:50px}
+@media(max-width:920px){.cols{grid-template-columns:1fr}}
+.card{background:linear-gradient(160deg,var(--card2),var(--card));border:1px solid var(--line);border-radius:16px;padding:20px;margin-bottom:16px}
+.card h3{font-size:13px;text-transform:uppercase;letter-spacing:.09em;color:var(--tx3);margin-bottom:14px;font-weight:700}
+canvas{width:100%;height:300px}
+table{width:100%;border-collapse:collapse;font-size:13.5px}
+td,th{padding:9px 6px;border-bottom:1px solid var(--line);text-align:left}
+th{color:var(--tx3);font-size:11px;text-transform:uppercase;letter-spacing:.07em}
+td:last-child,th:last-child{text-align:right}
+.ok{color:var(--up)}.bad{color:var(--dn)}.mid{color:var(--hold)}
+.kv{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px}
+.kv .b{background:#0d1526;border:1px solid var(--line);border-radius:11px;padding:10px 12px}
+.kv .k{font-size:10.5px;color:var(--tx3);text-transform:uppercase;letter-spacing:.06em}
+.kv .v{font-weight:700;font-size:15px;margin-top:2px}
+.bar{display:flex;align-items:center;gap:10px;margin-bottom:9px;font-size:12.5px}
+.bar .n{width:110px;color:var(--tx2)}
+.bar .t{flex:1;height:6px;background:#1a2540;border-radius:99px;overflow:hidden}
+.bar .t i{display:block;height:100%;border-radius:99px}
+.pill{display:inline-block;font-size:11.5px;background:#0d1526;border:1px solid var(--line);border-radius:99px;padding:4px 11px;margin:3px 4px 0 0;color:var(--tx2)}
+.note{font-size:13.5px;color:var(--tx2);line-height:1.65}
+.warn{background:rgba(245,185,80,.07);border:1px solid rgba(245,185,80,.25);border-radius:12px;padding:12px 16px;font-size:12.5px;color:#d8c08a;margin:0 0 40px}
+.big{font-size:34px;font-weight:800}
+.gauge{display:flex;align-items:center;gap:16px}
+</style></head><body>
+<header><div class="wrap nav"><a class="logo" href="index.html">PSX <span class="g">Edge</span></a><div style="flex:1"></div><a class="back" href="index.html">← All stocks</a></div></header>
+<div class="wrap" id="app"><p style="padding:40px 0;color:var(--tx3)">Loading…</p></div>
+<script>
+const $=s=>document.querySelector(s), fmt=n=>Number(n).toLocaleString("en-PK",{maximumFractionDigits:2});
+const cls=v=>v.includes("Buy")?"v-up":v.includes("Sell")?"v-dn":"v-h";
+const sc=s=>s>=6.5?"var(--up)":s>=4.5?"var(--hold)":"var(--dn)";
+const sym=new URLSearchParams(location.search).get("s");
+fetch(`output/${sym}.json`).then(r=>{if(!r.ok)throw 0;return r.json()}).then(d=>{
+document.title=`PSX Edge — ${d.symbol}`;
+const o=d.order_table,v=d.verdict,i=d.indicators,f=d.fibonacci;
+$("#app").innerHTML=`
+<div class="head"><h1>${d.symbol}</h1><div class="px mono">Rs ${fmt(d.close)}</div>
+<span class="verdict ${cls(v.call)}">${v.call.toUpperCase()} · ${v.confidence_pct}%</span></div>
+<div class="sub">As of ${d.as_of} · Volume ${fmt(d.volume)} · ${d.market_structure} market structure${d.corporate_actions_adjusted?.length?" · split-adjusted":""}</div>
+<div class="cols"><div>
+  <div class="card"><h3>Price — last 120 sessions</h3><canvas id="ch" height="300"></canvas></div>
+  <div class="card"><h3>📊 Daily Order Table (pivot method)</h3>
+  ${o.setup_valid_rr_rule?'<p class="note ok" style="margin-bottom:10px">✓ Setup passes the 1:2 risk-reward rule.</p>':'<p class="note mid" style="margin-bottom:10px">⚠ No valid setup today — risk:reward '+o.risk_reward+' is below the required 1:2. Levels shown for reference only.</p>'}
+  <table><tr><th>Order</th><th>Rationale</th><th>Price (PKR)</th></tr>
+  <tr><td><b>Primary Buy (Limit)</b></td><td>Pullback to S1 / Fib 38.2%</td><td class="mono">${fmt(o.primary_buy_limit)}</td></tr>
+  <tr><td><b>Secondary Buy (Dip)</b></td><td>Deep entry S2 / Fib 61.8%</td><td class="mono">${fmt(o.secondary_buy_dip)}</td></tr>
+  <tr><td><b>Stop Loss</b></td><td>~2% below S2 — hard exit</td><td class="mono bad">${fmt(o.stop_loss)}</td></tr>
+  <tr><td><b>Take Profit 1</b></td><td>R1 resistance</td><td class="mono ok">${fmt(o.take_profit_1)}</td></tr>
+  <tr><td><b>Take Profit 2</b></td><td>R2 resistance</td><td class="mono ok">${fmt(o.take_profit_2)}</td></tr>
+  <tr><td><b>Risk : Reward</b></td><td>Entry→SL vs Entry→TP2</td><td class="mono">${o.risk_reward}</td></tr></table></div>
+  <div class="card"><h3>Key Indicators</h3><div class="kv">${[
+    ["RSI 14",i.rsi14],["MACD hist",i.macd_hist],["ADX",i.adx],["ATR %",i.atr_pct],
+    ["EMA 20",i.ema20],["EMA 50",i.ema50],["EMA 200",i.ema200],["MFI",i.mfi14],
+    ["CMF",i.cmf20],["Stoch RSI K",i.stoch_rsi_k],["CCI 20",i.cci20],["VWAP 20",i.vwap20]]
+    .map(([k,x])=>`<div class="b"><div class="k">${k}</div><div class="v mono">${x??"—"}</div></div>`).join("")}
+    <div class="b"><div class="k">EMA cross</div><div class="v">${i.golden_cross_recent?"🟢 Golden":i.death_cross_recent?"🔴 Death":"—"}</div></div>
+    <div class="b"><div class="k">OBV 20d</div><div class="v">${i.obv_rising_20d?"Rising":"Falling"}</div></div></div></div>
+  <div class="card"><h3>Fibonacci (swing ${fmt(f.swing_low)} → ${fmt(f.swing_high)})</h3>
+  <table><tr><th>Retracement</th><th>Price</th><th>Extension</th><th>Target</th></tr>${
+   Object.entries(f.retracement).map(([k,p],ix)=>{const e=Object.entries(f.extension)[ix];
+   return `<tr><td>${k}${k==="0.618"?' <span class="pill" style="color:var(--up)">golden pocket</span>':""}</td><td class="mono">${fmt(p)}</td><td>${e?e[0]:""}</td><td class="mono">${e?fmt(e[1]):""}</td></tr>`}).join("")}
+  </table>${f.price_in_golden_pocket?'<p class="note ok" style="margin-top:10px">Price is inside the golden pocket (0.618–0.65) — statistically favored reversal zone.</p>':""}</div>
+  <div class="card"><h3>Market Structure & Patterns</h3>
+   <div class="note">${d.structure_events.bos?`<span class="pill">${d.structure_events.bos}</span>`:""}${d.structure_events.choch?`<span class="pill">${d.structure_events.choch}</span>`:""}
+   ${d.candlestick_patterns.map(p=>`<span class="pill" title="${p.meaning}">${p.date}: ${p.pattern}</span>`).join("")||"No notable candlestick patterns in the last sessions."}</div>
+   <p class="note" style="margin-top:12px"><b>Elliott estimate:</b> ${d.elliott_wave.phase} (${d.elliott_wave.confidence} confidence) — ${d.elliott_wave.count}</p>
+   <p class="note" style="margin-top:8px"><b>Volume:</b> ${d.volume_analysis.read}. Today ${d.volume_analysis.volume_vs_20d_avg}× the 20-day average.</p></div>
+  <div class="card"><h3>Summary & Execution Plan</h3><p class="note">${d.summary}</p></div>
+</div><div>
+  <div class="card"><h3>Composite Score</h3>
+   <div class="gauge"><div class="big mono" style="color:${sc(v.composite_score)}">${v.composite_score}</div><div style="color:var(--tx3);font-size:12px">out of 10<br>${v.confidence_pct}% confidence</div></div>
+   <div style="margin-top:16px">${Object.entries(v.scores).map(([k,x])=>`<div class="bar"><div class="n">${k.replace("_"," ")}</div><div class="t"><i style="width:${x*10}%;background:${sc(x)}"></i></div><b class="mono" style="font-size:12px">${x}</b></div>`).join("")}</div></div>
+  <div class="card"><h3>Multi-Timeframe</h3>${Object.entries(d.multi_timeframe).map(([k,x])=>`<div class="bar"><div class="n">${k}</div><div style="font-weight:600;color:${x==="Bullish"?"var(--up)":x==="Bearish"?"var(--dn)":x==="Sideways"?"var(--hold)":"var(--tx3)"}">${x}</div></div>`).join("")}</div>
+  <div class="card"><h3>Price Targets</h3><table>${Object.entries(d.price_targets).map(([k,x])=>`<tr><td>${k.replace(/_/g," ")}</td><td class="mono">${fmt(x)}</td></tr>`).join("")}</table></div>
+  <div class="card"><h3>Support / Resistance</h3><table><tr><th>Level</th><th>Touches</th><th>Price</th></tr>
+   ${d.resistance_levels.map(l=>`<tr><td class="bad">Resistance</td><td>${l.touches}</td><td class="mono">${fmt(l.price)}</td></tr>`).join("")}
+   ${d.support_levels.map(l=>`<tr><td class="ok">Support</td><td>${l.touches}</td><td class="mono">${fmt(l.price)}</td></tr>`).join("")}</table></div>
+  <div class="card"><h3>Classic Pivots</h3><table>${Object.entries(d.pivots_classic).map(([k,x])=>`<tr><td>${k}</td><td class="mono">${fmt(x)}</td></tr>`).join("")}</table></div>
+</div></div>
+<div class="warn">${d.disclaimer} Not registered investment advice under SECP regulations. Data may exclude: ${d.unavailable_in_v1.join(", ")}.</div>`;
+draw(d);}).catch(()=>$("#app").innerHTML='<p style="padding:40px 0">Stock not found. <a href="index.html" style="color:var(--acc)">← Back</a></p>');
+function draw(d){
+const c=$("#ch"),x=c.getContext("2d"),W=c.width=c.offsetWidth*2,H=c.height=600;x.scale(1,1);
+const hist=d.price_history||[];if(!hist.length)return;
+const ps=hist.map(h=>h[1]),o=d.order_table;
+const lv=[[o.primary_buy_limit,"#4f7cff","Buy"],[o.stop_loss,"#ff5470","SL"],[o.take_profit_2,"#10d98e","TP2"]];
+let lo=Math.min(...ps,o.stop_loss)*.995,hi=Math.max(...ps,o.take_profit_2)*1.005;
+const X=i=>40+(W-60)*i/(ps.length-1),Y=p=>18+(H-58)*(1-(p-lo)/(hi-lo));
+x.strokeStyle="#1e2a44";x.lineWidth=1;x.beginPath();
+for(let g=0;g<5;g++){const y=18+(H-58)*g/4;x.moveTo(40,y);x.lineTo(W-20,y);}x.stroke();
+x.fillStyle="#5a6a8f";x.font="20px JetBrains Mono";
+for(let g=0;g<5;g++){x.fillText(fmt(hi-(hi-lo)*g/4),2,24+(H-58)*g/4);}
+const gp=d.fibonacci.golden_pocket;x.fillStyle="rgba(245,185,80,.08)";
+x.fillRect(40,Y(gp[1]),W-60,Math.max(2,Y(gp[0])-Y(gp[1])));
+const grad=x.createLinearGradient(0,0,0,H);grad.addColorStop(0,"rgba(79,124,255,.35)");grad.addColorStop(1,"rgba(79,124,255,0)");
+x.beginPath();ps.forEach((p,i)=>i?x.lineTo(X(i),Y(p)):x.moveTo(X(i),Y(p)));
+x.strokeStyle="#6f9aff";x.lineWidth=3;x.stroke();
+x.lineTo(X(ps.length-1),H-40);x.lineTo(40,H-40);x.closePath();x.fillStyle=grad;x.fill();
+lv.forEach(([p,col,lab])=>{if(p<lo||p>hi)return;x.setLineDash([8,7]);x.strokeStyle=col;x.lineWidth=2;
+x.beginPath();x.moveTo(40,Y(p));x.lineTo(W-20,Y(p));x.stroke();x.setLineDash([]);
+x.fillStyle=col;x.font="bold 20px Inter";x.fillText(lab+" "+fmt(p),W-190,Y(p)-6);});
+c.style.height="300px";}
+</script></body></html>

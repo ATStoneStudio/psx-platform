@@ -103,6 +103,7 @@ def run_engine():
                 continue
             res = analyze(sym, df)
             res["corporate_actions_adjusted"] = ca_events
+            res["price_history"] = [[d.strftime("%Y-%m-%d"), round(float(c), 2)] for d, c in df["Close"].tail(120).items()]
             (OUT / f"{sym}.json").write_text(json.dumps(res, default=str))
             summary.append({"symbol": sym, "close": res["close"], "as_of": res["as_of"],
                             "verdict": res["verdict"]["call"],
@@ -120,8 +121,8 @@ def run_engine():
                 first_error = False
     summary.sort(key=lambda x: -x["score"])
     (OUT / "summary.json").write_text(json.dumps(
-        {"generated": str(date.today()), "stocks": summary,
-         "excluded_stale": stale}, default=str))
+        {"generated": str(date.today()), "stocks": summary, "excluded_stale": stale,
+         "macro": dict(con.execute("SELECT series, value FROM macro WHERE (series, date) IN (SELECT series, MAX(date) FROM macro GROUP BY series)"))}, default=str))
     print(f"Engine done: {len(summary)}/{len(symbols)} stocks analyzed.")
     if not summary:
         sys.exit(1)  # fail the workflow loudly instead of committing empty output

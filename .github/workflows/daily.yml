@@ -1,9 +1,10 @@
 name: Daily PSX analysis
 on:
   schedule:
-    # 5:00 PM PKT = 12:00 UTC, Monday-Friday
+    # 5:00 PM PKT = 12:00 UTC, Mon-Fri (+ 7:30 PM PKT retry)
     - cron: "0 12 * * 1-5"
-  workflow_dispatch: {}   # manual run button
+    - cron: "30 14 * * 1-5"
+  workflow_dispatch: {}
 
 permissions:
   contents: write
@@ -22,6 +23,7 @@ jobs:
         run: |
           git config user.name "psx-bot"
           git config user.email "bot@users.noreply.github.com"
-          git add data/psx.sqlite output/
+          git pull --rebase
+          git add data/psx.sqlite output/ failed_symbols.txt
           git commit -m "Daily analysis $(date -u +%F)" || echo "no changes"
           git push
