@@ -23,7 +23,7 @@ jobs:
         run: |
           git config user.name "psx-bot"
           git config user.email "bot@users.noreply.github.com"
-          git pull --rebase
-          git add data/psx.sqlite output/ failed_symbols.txt
+          git add data/ output/ failed_symbols.txt
           git commit -m "Daily analysis $(date -u +%F)" || echo "no changes"
+          git pull --rebase origin main
           git push
