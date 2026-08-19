@@ -109,3 +109,74 @@ def load_symbol(con: sqlite3.Connection, symbol: str, adjust: bool = True):
     if adjust and len(df) > 1:
         df, events = adjust_corporate_actions(df)
     return df, events
+
+
+# ======================================================================
+# v2 — audit trail, calibration state, macro series access
+# ======================================================================
+
+SCHEMA_V2 = """
+CREATE TABLE IF NOT EXISTS ohlcv (
+  symbol TEXT NOT NULL, date TEXT NOT NULL,
+  open REAL, high REAL, low REAL, close REAL, volume INTEGER,
+  PRIMARY KEY (symbol, date)
+);
+CREATE TABLE IF NOT EXISTS macro (
+  series TEXT NOT NULL, date TEXT NOT NULL, value REAL,
+  PRIMARY KEY (series, date)
+);
+-- Every signal the engine publishes, frozen at publish time (audit trail).
+-- outcome: NULL while open, then TP1 | TP2 | SL | EXPIRED | NOT_FILLED | VOID_CA
+CREATE TABLE IF NOT EXISTS predictions_history (
+  symbol TEXT NOT NULL, signal_date TEXT NOT NULL,
+  verdict TEXT, composite REAL, confidence INTEGER, horizon TEXT,
+  entry REAL, stop_loss REAL, tp1 REAL, tp2 REAL,
+  setup_valid INTEGER, scores_json TEXT,
+  outcome TEXT, fill_date TEXT, outcome_date TEXT,
+  days_to_outcome INTEGER, return_pct REAL,
+  source TEXT DEFAULT 'live',   -- 'live' = published pre-close; 'backfill' = simulated replay
+  PRIMARY KEY (symbol, signal_date)
+);
+-- Key/value store for calibration state (current weights, adjustment log).
+CREATE TABLE IF NOT EXISTS calibration (
+  key TEXT PRIMARY KEY, value TEXT
+);
+"""
+
+
+def ensure_schema(con: sqlite3.Connection) -> None:
+    """Idempotent: safe to call at the top of every run."""
+    con.executescript(SCHEMA_V2)
+    cols = [r[1] for r in con.execute("PRAGMA table_info(predictions_history)")]
+    if "source" not in cols:  # migrate tables created by an earlier v2 draft
+        con.execute("ALTER TABLE predictions_history ADD COLUMN source TEXT DEFAULT 'live'")
+    con.commit()
+
+
+def load_macro_series(con: sqlite3.Connection, name: str) -> pd.Series:
+    """Full stored history of one macro series as a date-indexed float Series."""
+    rows = con.execute(
+        "SELECT date, value FROM macro WHERE series=? AND date LIKE '____-__-__' "
+        "ORDER BY date", (name,)).fetchall()
+    if not rows:
+        return pd.Series(dtype=float)
+    return pd.Series([float(v) for _, v in rows],
+                     index=pd.to_datetime([d for d, _ in rows]))
+
+
+def load_macro_context(con: sqlite3.Connection) -> dict:
+    """Context dict consumed by engine.analysis.analyze(): brent/usdpkr/kse100."""
+    return {name: load_macro_series(con, name)
+            for name in ("brent", "usdpkr", "kse100")}
+
+
+def get_calibration(con: sqlite3.Connection, key: str, default=None):
+    import json
+    row = con.execute("SELECT value FROM calibration WHERE key=?", (key,)).fetchone()
+    return json.loads(row[0]) if row else default
+
+
+def set_calibration(con: sqlite3.Connection, key: str, value) -> None:
+    import json
+    con.execute("INSERT OR REPLACE INTO calibration VALUES (?,?)", (key, json.dumps(value)))
+    con.commit()

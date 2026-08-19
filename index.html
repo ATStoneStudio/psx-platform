@@ -87,6 +87,22 @@ footer{border-top:1px solid var(--line);padding:26px 0 40px;color:var(--tx3);fon
     <select id="sort"><option value="score">Sort: Score</option><option value="confidence">Confidence</option><option value="symbol">Symbol A–Z</option><option value="close">Price</option></select>
   </div>
   <div class="grid" id="grid"></div>
+
+  <section id="track" style="display:none;padding-bottom:60px">
+    <h2 style="font-size:24px;font-weight:800;letter-spacing:-.02em">Track record — every signal, audited</h2>
+    <p style="color:var(--tx2);font-size:14px;margin:8px 0 18px;max-width:720px">
+      Every published R:R-valid setup is frozen at publish time and scored against what the market
+      actually did: <b>TP1/TP2</b> = target touched after a fill, <b>SL</b> = stop touched
+      (same-bar stop counts as a loss), <b>Expired</b> = closed at market after 5 sessions,
+      <b>Not&nbsp;filled</b> = price never pulled back to the limit. No cherry-picking — misses stay on the board.</p>
+    <div class="stats" id="trstats" style="margin:0 0 18px"></div>
+    <div style="background:var(--card);border:1px solid var(--line);border-radius:16px;padding:6px 18px 14px;overflow-x:auto">
+      <table style="width:100%;border-collapse:collapse;font-size:13px;min-width:760px">
+        <thead><tr id="trhead"></tr></thead><tbody id="trbody"></tbody>
+      </table>
+    </div>
+    <p id="trnote" style="color:var(--tx3);font-size:12px;margin-top:10px"></p>
+  </section>
 </main>
 
 <footer><div class="wrap">PSX Edge · Data: Pakistan Stock Exchange EOD · Analysis is fully algorithmic (pivot points, Fibonacci, momentum, market structure). Signals are probabilistic and past performance does not guarantee future results. Not registered investment advice under SECP regulations.<span id="excl"></span></div></footer>
@@ -102,7 +118,10 @@ fetch("output/summary.json").then(r=>r.json()).then(d=>{
   document.getElementById("tickers").innerHTML=
     (m.kse100?`<span>KSE-100 <b>${fmt(m.kse100)}</b></span>`:"")+
     (m.usdpkr?`<span>USD/PKR <b>${fmt(m.usdpkr)}</b></span>`:"")+
-    (m.brent?`<span>Brent <b>$${fmt(m.brent)}</b></span>`:"");
+    (m.brent?`<span>Brent <b>$${fmt(m.brent)}</b></span>`:"")+
+    (d.regime&&d.regime!=="Unknown"?`<span style="color:${d.regime==="Risk-On"?"var(--up)":"var(--dn)"};font-weight:700">● ${d.regime}</span>`:"");
+  if(d.regime==="Risk-Off")document.querySelector(".controls").insertAdjacentHTML("beforebegin",
+    '<div class="warn">🔻 <b>Risk-Off regime:</b> KSE-100 is trading below its 50-day EMA — all composite scores are being reduced by the market-regime filter. Expect fewer and weaker buy signals until the index reclaims trend.</div>');
   const sb=DATA.filter(x=>x.verdict==="Strong Buy").length, vs=DATA.filter(x=>x.setup_valid).length;
   document.getElementById("stats").innerHTML=[["Stocks analyzed",DATA.length],["Strong Buy signals",sb],["Valid R:R setups",vs],["Bullish structure",DATA.filter(x=>x.structure==="Bullish").length]]
     .map(([k,v])=>`<div class="stat"><div class="k">${k}</div><div class="v">${v}</div></div>`).join("");
@@ -128,6 +147,43 @@ function render(){
     <div class="row"><span>Buy <b class="mono">${fmt(x.primary_buy)}</b></span><span>SL <b class="mono">${fmt(x.stop_loss)}</b></span><span>TP1 <b class="mono">${fmt(x.tp1)}</b></span></div>
   </a>`).join("")||'<p style="color:var(--tx3)">No matches.</p>';
 }
+/* ---------- transparent track record (output/track_record.json) ---------- */
+const OC={TP2:["TP2 hit","var(--up)"],TP1:["TP1 hit","var(--up)"],SL:["Stopped","var(--dn)"],
+          EXPIRED:["Expired","var(--hold)"],NOT_FILLED:["Not filled","var(--tx3)"],VOID_CA:["Void (corp. action)","var(--tx3)"]};
+fetch("output/track_record.json").then(r=>{if(!r.ok)throw 0;return r.json()}).then(t=>{
+  const s30=t.last_30d||{},all=t.all_time||{};
+  if(!all.signals)return;
+  document.getElementById("track").style.display="block";
+  const tile=(k,v,sub)=>`<div class="stat"><div class="k">${k}</div><div class="v">${v??"—"}</div>${sub?`<div class="k" style="margin-top:2px;text-transform:none;letter-spacing:0">${sub}</div>`:""}</div>`;
+  document.getElementById("trstats").innerHTML=
+    tile("Win rate · 30d",s30.win_rate_pct!=null?s30.win_rate_pct+"%":"—",`${s30.wins||0}W / ${s30.losses||0}L of ${s30.trades||0} trades`)+
+    tile("Win rate · all time",all.win_rate_pct!=null?all.win_rate_pct+"%":"—",`${all.trades} trades from ${all.signals} signals`)+
+    tile("Avg return / trade",all.avg_return_pct!=null?all.avg_return_pct+"%":"—","incl. losses & expiries")+
+    tile("Avg days to win",all.avg_days_to_win??"—","sessions, fill → target")+
+    tile("Open signals",t.open_signals??0,"awaiting outcome");
+  document.getElementById("trhead").innerHTML=
+    ["Symbol","Signal date","Verdict","Entry","SL","TP1","TP2","Outcome","Return","Days"]
+    .map((h,i)=>`<th style="text-align:${i>2?"right":"left"};color:var(--tx3);font-size:11px;text-transform:uppercase;letter-spacing:.07em;padding:10px 8px;border-bottom:1px solid var(--line)">${h}</th>`).join("");
+  document.getElementById("trbody").innerHTML=(t.ledger||[]).slice(0,20).map(r=>{
+    const[label,col]=OC[r.outcome]||[r.outcome,"var(--tx2)"];
+    const ret=r.return_pct!=null?(r.return_pct>0?"+":"")+r.return_pct+"%":"—";
+    return `<tr>
+      <td style="padding:9px 8px;border-bottom:1px solid var(--line)"><a href="stock.html?s=${r.symbol}" style="font-weight:700">${r.symbol}</a>${r.source==="backfill"?' <span title="Simulated walk-forward replay, not a signal published in advance" style="font-size:9px;color:var(--tx3);border:1px solid var(--line);border-radius:99px;padding:1px 6px">SIM</span>':""}</td>
+      <td style="padding:9px 8px;border-bottom:1px solid var(--line);color:var(--tx2)" class="mono">${r.signal_date}</td>
+      <td style="padding:9px 8px;border-bottom:1px solid var(--line);color:var(--tx2)">${r.verdict}</td>
+      <td style="padding:9px 8px;border-bottom:1px solid var(--line);text-align:right" class="mono">${fmt(r.entry)}</td>
+      <td style="padding:9px 8px;border-bottom:1px solid var(--line);text-align:right;color:var(--tx3)" class="mono">${fmt(r.stop_loss)}</td>
+      <td style="padding:9px 8px;border-bottom:1px solid var(--line);text-align:right;color:var(--tx3)" class="mono">${fmt(r.tp1)}</td>
+      <td style="padding:9px 8px;border-bottom:1px solid var(--line);text-align:right;color:var(--tx3)" class="mono">${fmt(r.tp2)}</td>
+      <td style="padding:9px 8px;border-bottom:1px solid var(--line);font-weight:700;color:${col}">${label}</td>
+      <td style="padding:9px 8px;border-bottom:1px solid var(--line);text-align:right;font-weight:600;color:${r.return_pct>0?"var(--up)":r.return_pct<0?"var(--dn)":"var(--tx3)"}" class="mono">${ret}</td>
+      <td style="padding:9px 8px;border-bottom:1px solid var(--line);text-align:right;color:var(--tx2)" class="mono">${r.days??"—"}</td></tr>`}).join("");
+  const wl=(t.weights_log||[]);
+  document.getElementById("trnote").textContent=
+    `Method: ${t.method?.fill_rule}; expiry after ${t.method?.expiry_days} sessions; ${t.method?.conservative}. `+
+    ((t.ledger||[]).some(r=>r.source==="backfill")?`Rows marked SIM are a simulated historical replay of the same engine, shown for context. `:"")+
+    (wl.length?`Latest calibration: ${wl[wl.length-1].reason} → weights auto-adjusted.`:"Signal weights: no calibration adjustment yet.");
+}).catch(()=>{});
 document.getElementById("q").addEventListener("input",render);
 document.getElementById("sort").addEventListener("change",render);
 document.querySelectorAll(".chip").forEach(c=>c.onclick=()=>{document.querySelectorAll(".chip").forEach(x=>x.classList.remove("on"));c.classList.add("on");f=c.dataset.f;render();});

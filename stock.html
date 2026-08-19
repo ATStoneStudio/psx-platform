@@ -55,21 +55,35 @@ const sym=new URLSearchParams(location.search).get("s");
 fetch(`output/${sym}.json`).then(r=>{if(!r.ok)throw 0;return r.json()}).then(d=>{
 document.title=`PSX Edge — ${d.symbol}`;
 const o=d.order_table,v=d.verdict,i=d.indicators,f=d.fibonacci;
+const tt=o.time_to_target||{},mx=d.macro_context||null;
 $("#app").innerHTML=`
 <div class="head"><h1>${d.symbol}</h1><div class="px mono">Rs ${fmt(d.close)}</div>
-<span class="verdict ${cls(v.call)}">${v.call.toUpperCase()} · ${v.confidence_pct}%</span></div>
+<span class="verdict ${cls(v.call)}">${v.call.toUpperCase()} · ${v.confidence_pct}%</span>
+<span class="pill" style="align-self:center">⏱ ${v.horizon||"Swing (2-4 weeks)"}</span></div>
 <div class="sub">As of ${d.as_of} · Volume ${fmt(d.volume)} · ${d.market_structure} market structure${d.corporate_actions_adjusted?.length?" · split-adjusted":""}</div>
 <div class="cols"><div>
   <div class="card"><h3>Price — last 120 sessions</h3><canvas id="ch" height="300"></canvas></div>
-  <div class="card"><h3>📊 Daily Order Table (pivot method)</h3>
+  <div class="card"><h3>📊 Daily Order Table (pivot method) <span class="pill" style="color:var(--acc);text-transform:none;letter-spacing:0">⏱ ${o.horizon||"Short-Term (1-3 days)"}</span></h3>
   ${o.setup_valid_rr_rule?'<p class="note ok" style="margin-bottom:10px">✓ Setup passes the 1:2 risk-reward rule.</p>':'<p class="note mid" style="margin-bottom:10px">⚠ No valid setup today — risk:reward '+o.risk_reward+' is below the required 1:2. Levels shown for reference only.</p>'}
-  <table><tr><th>Order</th><th>Rationale</th><th>Price (PKR)</th></tr>
-  <tr><td><b>Primary Buy (Limit)</b></td><td>Pullback to S1 / Fib 38.2%</td><td class="mono">${fmt(o.primary_buy_limit)}</td></tr>
-  <tr><td><b>Secondary Buy (Dip)</b></td><td>Deep entry S2 / Fib 61.8%</td><td class="mono">${fmt(o.secondary_buy_dip)}</td></tr>
-  <tr><td><b>Stop Loss</b></td><td>~2% below S2 — hard exit</td><td class="mono bad">${fmt(o.stop_loss)}</td></tr>
-  <tr><td><b>Take Profit 1</b></td><td>R1 resistance</td><td class="mono ok">${fmt(o.take_profit_1)}</td></tr>
-  <tr><td><b>Take Profit 2</b></td><td>R2 resistance</td><td class="mono ok">${fmt(o.take_profit_2)}</td></tr>
-  <tr><td><b>Risk : Reward</b></td><td>Entry→SL vs Entry→TP2</td><td class="mono">${o.risk_reward}</td></tr></table></div>
+  <table><tr><th>Order</th><th>Rationale</th><th>Est. days</th><th>Price (PKR)</th></tr>
+  <tr><td><b>Primary Buy (Limit)</b></td><td>Pullback to S1 / Fib 38.2%</td><td></td><td class="mono">${fmt(o.primary_buy_limit)}</td></tr>
+  <tr><td><b>Secondary Buy (Dip)</b></td><td>Deep entry S2 / Fib 61.8%</td><td></td><td class="mono">${fmt(o.secondary_buy_dip)}</td></tr>
+  <tr><td><b>Stop Loss</b></td><td>~2% below S2 — hard exit</td><td></td><td class="mono bad">${fmt(o.stop_loss)}</td></tr>
+  <tr><td><b>Take Profit 1</b></td><td>R1 resistance</td><td class="mono mid">${tt.tp1_days?"~"+tt.tp1_days:"—"}</td><td class="mono ok">${fmt(o.take_profit_1)}</td></tr>
+  <tr><td><b>Take Profit 2</b></td><td>R2 resistance</td><td class="mono mid">${tt.tp2_days?"~"+tt.tp2_days:"—"}</td><td class="mono ok">${fmt(o.take_profit_2)}</td></tr>
+  <tr><td><b>Risk : Reward</b></td><td>Entry→SL vs Entry→TP2</td><td></td><td class="mono">${o.risk_reward}</td></tr></table>
+  ${tt.tp1_days?`<p class="note" style="margin-top:10px;font-size:12px;color:var(--tx3)">⏱ Time-to-target estimated from 14-day ATR (Rs ${fmt(o.atr14)}) assuming ~½ ATR of net progress per session — an estimate, not a guarantee.</p>`:""}</div>
+
+  <div class="card"><h3>🧮 Position Sizer — risk-based share calculator</h3>
+  <div class="kv" style="grid-template-columns:repeat(auto-fill,minmax(170px,1fr))">
+    <div class="b"><div class="k">Total capital (PKR)</div><input id="cap" type="number" min="0" step="1000" value="100000" style="width:100%;background:transparent;border:none;border-bottom:1px solid var(--line);color:var(--tx);font:700 15px 'JetBrains Mono',monospace;outline:none;padding:4px 0"></div>
+    <div class="b"><div class="k">Max risk per trade (%)</div><input id="riskpct" type="number" min="0.1" max="10" step="0.1" value="2" style="width:100%;background:transparent;border:none;border-bottom:1px solid var(--line);color:var(--tx);font:700 15px 'JetBrains Mono',monospace;outline:none;padding:4px 0"></div>
+    <div class="b"><div class="k">Entry</div><select id="entrysel" style="width:100%;background:transparent;border:none;border-bottom:1px solid var(--line);color:var(--tx);font:700 14px Inter;outline:none;padding:4px 0">
+      <option value="${o.primary_buy_limit}">Primary ${fmt(o.primary_buy_limit)}</option>
+      <option value="${o.secondary_buy_dip}">Dip ${fmt(o.secondary_buy_dip)}</option></select></div>
+  </div>
+  <div class="kv" id="sizerout" style="margin-top:12px"></div>
+  <p class="note" style="margin-top:10px;font-size:12px;color:var(--tx3)">Shares = (capital × risk%) ÷ (entry − stop-loss), capped by affordability. Place the buy limit and the stop-loss together in your broker app (e.g. Finqalab) — the math only protects you if the stop is actually entered.</p></div>
   <div class="card"><h3>Key Indicators</h3><div class="kv">${[
     ["RSI 14",i.rsi14],["MACD hist",i.macd_hist],["ADX",i.adx],["ATR %",i.atr_pct],
     ["EMA 20",i.ema20],["EMA 50",i.ema50],["EMA 200",i.ema200],["MFI",i.mfi14],
@@ -90,8 +104,15 @@ $("#app").innerHTML=`
   <div class="card"><h3>Summary & Execution Plan</h3><p class="note">${d.summary}</p></div>
 </div><div>
   <div class="card"><h3>Composite Score</h3>
-   <div class="gauge"><div class="big mono" style="color:${sc(v.composite_score)}">${v.composite_score}</div><div style="color:var(--tx3);font-size:12px">out of 10<br>${v.confidence_pct}% confidence</div></div>
+   <div class="gauge"><div class="big mono" style="color:${sc(v.composite_score)}">${v.composite_score}</div><div style="color:var(--tx3);font-size:12px">out of 10<br>${v.confidence_pct}% confidence${mx&&mx.adjustment?`<br>technical ${v.composite_technical} ${mx.adjustment>0?"+":""}${mx.adjustment} macro`:""}</div></div>
    <div style="margin-top:16px">${Object.entries(v.scores).map(([k,x])=>`<div class="bar"><div class="n">${k.replace("_"," ")}</div><div class="t"><i style="width:${x*10}%;background:${sc(x)}"></i></div><b class="mono" style="font-size:12px">${x}</b></div>`).join("")}</div></div>
+  ${mx?`<div class="card"><h3>Macro Context</h3>
+   <div class="bar"><div class="n">Sector</div><div style="font-weight:600">${mx.sector}</div></div>
+   ${mx.brent_20d_pct!=null?`<div class="bar"><div class="n">Brent 20d</div><div style="font-weight:600;color:${mx.brent_20d_pct>0?"var(--up)":"var(--dn)"}">${mx.brent_20d_pct>0?"+":""}${mx.brent_20d_pct}%</div></div>`:""}
+   ${mx.usdpkr_20d_pct!=null?`<div class="bar"><div class="n">USD/PKR 20d</div><div style="font-weight:600;color:${mx.usdpkr_20d_pct>0?"var(--dn)":"var(--up)"}">${mx.usdpkr_20d_pct>0?"+":""}${mx.usdpkr_20d_pct}%</div></div>`:""}
+   <div class="bar"><div class="n">Index regime</div><div style="font-weight:600;color:${mx.regime==="Risk-On"?"var(--up)":mx.regime==="Risk-Off"?"var(--dn)":"var(--tx3)"}">${mx.regime}${mx.kse100_vs_ema50_pct!=null?` (${mx.kse100_vs_ema50_pct>0?"+":""}${mx.kse100_vs_ema50_pct}% vs 50-EMA)`:""}</div></div>
+   <div class="bar"><div class="n">Score impact</div><div class="mono" style="font-weight:700;color:${mx.adjustment>0?"var(--up)":mx.adjustment<0?"var(--dn)":"var(--tx3)"}">${mx.adjustment>0?"+":""}${mx.adjustment}</div></div>
+   ${(mx.notes||[]).length?`<p class="note" style="margin-top:8px;font-size:12px">${mx.notes.join(" · ")}</p>`:""}</div>`:""}
   <div class="card"><h3>Multi-Timeframe</h3>${Object.entries(d.multi_timeframe).map(([k,x])=>`<div class="bar"><div class="n">${k}</div><div style="font-weight:600;color:${x==="Bullish"?"var(--up)":x==="Bearish"?"var(--dn)":x==="Sideways"?"var(--hold)":"var(--tx3)"}">${x}</div></div>`).join("")}</div>
   <div class="card"><h3>Price Targets</h3><table>${Object.entries(d.price_targets).map(([k,x])=>`<tr><td>${k.replace(/_/g," ")}</td><td class="mono">${fmt(x)}</td></tr>`).join("")}</table></div>
   <div class="card"><h3>Support / Resistance</h3><table><tr><th>Level</th><th>Touches</th><th>Price</th></tr>
@@ -100,7 +121,34 @@ $("#app").innerHTML=`
   <div class="card"><h3>Classic Pivots</h3><table>${Object.entries(d.pivots_classic).map(([k,x])=>`<tr><td>${k}</td><td class="mono">${fmt(x)}</td></tr>`).join("")}</table></div>
 </div></div>
 <div class="warn">${d.disclaimer} Not registered investment advice under SECP regulations. Data may exclude: ${d.unavailable_in_v1.join(", ")}.</div>`;
-draw(d);}).catch(()=>$("#app").innerHTML='<p style="padding:40px 0">Stock not found. <a href="index.html" style="color:var(--acc)">← Back</a></p>');
+draw(d);sizer(d);}).catch(()=>$("#app").innerHTML='<p style="padding:40px 0">Stock not found. <a href="index.html" style="color:var(--acc)">← Back</a></p>');
+/* ---------- position sizer: shares = capital·risk% / (entry − SL) ---------- */
+function sizer(d){
+  const o=d.order_table,out=$("#sizerout");
+  if(!out)return;
+  const calc=()=>{
+    const cap=Math.max(0,+$("#cap").value||0), rp=Math.min(10,Math.max(.1,+$("#riskpct").value||2));
+    const entry=+$("#entrysel").value, sl=o.stop_loss, perShare=entry-sl;
+    if(!(perShare>0)||!cap){out.innerHTML='<div class="b" style="grid-column:1/-1"><div class="v mid">Enter capital — and note the stop must sit below the entry.</div></div>';return;}
+    const riskAmt=cap*rp/100;
+    let shares=Math.floor(riskAmt/perShare);
+    const afford=Math.floor(cap/entry), capped=shares>afford;
+    shares=Math.min(shares,afford);
+    const cost=shares*entry, loss=shares*perShare;
+    const g1=shares*(o.take_profit_1-entry), g2=shares*(o.take_profit_2-entry);
+    const box=(k,v,cl)=>`<div class="b"><div class="k">${k}</div><div class="v mono ${cl||""}">${v}</div></div>`;
+    out.innerHTML=
+      box("Shares to buy",shares?shares.toLocaleString("en-PK"):"0")+
+      box("Position cost",`Rs ${fmt(cost)} (${cap?Math.round(cost/cap*100):0}%)`)+
+      box("Risk if stopped",`−Rs ${fmt(loss)} (${cap?(loss/cap*100).toFixed(2):0}%)`,"bad")+
+      box("Gain at TP1",`+Rs ${fmt(Math.max(0,g1))}`,"ok")+
+      box("Gain at TP2",`+Rs ${fmt(Math.max(0,g2))}`,"ok")+
+      (capped?box("Note","Capped by affordability — risk is below your limit","mid"):"")+
+      (!shares?box("Note","Capital too small for even 1 share at this risk limit","mid"):"");
+  };
+  ["cap","riskpct","entrysel"].forEach(id=>$("#"+id).addEventListener("input",calc));
+  calc();
+}
 function draw(d){
 const c=$("#ch"),x=c.getContext("2d"),W=c.width=c.offsetWidth*2,H=c.height=600;x.scale(1,1);
 const hist=d.price_history||[];if(!hist.length)return;
