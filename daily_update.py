@@ -232,6 +232,46 @@ def calibrate_weights(con):
     return current, stats, len(rows)
 
 
+def simulate_portfolio(con, start_capital=100000.0, slot_frac=0.20):
+    """'Growth of Rs 100,000' series: mechanically follow every Buy-rated valid
+    setup from the audited ledger. Each trade takes a fixed 20% slot; its audited
+    P/L compounds into equity on the trade's outcome date (step curve — marked at
+    trade close, no intraday mark-to-market, no hindsight). KSE-100 closes ride
+    along for the benchmark line. Purely additive output: returns None if there is
+    nothing to plot, and the frontend hides the card in that case."""
+    trades = con.execute(
+        "SELECT outcome_date, return_pct, source FROM predictions_history "
+        "WHERE setup_valid=1 AND verdict IN ('Buy','Strong Buy') "
+        "AND outcome IN ('TP1','TP2','SL','EXPIRED') AND return_pct IS NOT NULL "
+        "AND outcome_date IS NOT NULL ORDER BY outcome_date").fetchall()
+    if len(trades) < 2:
+        return None
+    first_signal = con.execute(
+        "SELECT MIN(signal_date) FROM predictions_history "
+        "WHERE setup_valid=1 AND verdict IN ('Buy','Strong Buy')").fetchone()[0]
+    dates = [r[0] for r in con.execute(
+        "SELECT DISTINCT date FROM ohlcv WHERE date LIKE '____-__-__' AND date >= ? "
+        "ORDER BY date", (first_signal,))]
+    kse = dict(con.execute("SELECT date, value FROM macro WHERE series='kse100'"))
+    first_live = con.execute(
+        "SELECT MIN(outcome_date) FROM predictions_history "
+        "WHERE setup_valid=1 AND source='live' AND outcome_date IS NOT NULL").fetchone()[0]
+    eq, i, series, last_k = start_capital, 0, [], None
+    for d in dates:
+        while i < len(trades) and trades[i][0] <= d:
+            eq *= (1 + slot_frac * float(trades[i][1]) / 100)
+            i += 1
+        kv = kse.get(d)
+        if kv is not None:
+            last_k = float(kv)
+        series.append([d, round(eq, 2), round(last_k, 2) if last_k else None])
+    return {"start_capital": start_capital, "slot_pct": int(slot_frac * 100),
+            "rules": f"Every Buy/Strong Buy-rated valid setup takes a {int(slot_frac*100)}% "
+                     "slot of equity; its audited P/L (incl. losses, expiries, fills) is "
+                     "applied at trade close and compounds. No hindsight, no cherry-picking.",
+            "first_live_close": first_live, "trades": len(trades), "series": series}
+
+
 def write_track_record(con):
     """Public, transparent ledger -> output/track_record.json (index.html)."""
     def bucket(where=""):
@@ -262,21 +302,31 @@ def write_track_record(con):
     open_n = con.execute("SELECT COUNT(*) FROM predictions_history "
                          "WHERE setup_valid=1 AND outcome IS NULL").fetchone()[0]
     weights = get_calibration(con, "weights", WEIGHTS)
+    # Two cuts, both published: "buy" = setups the site actually recommended
+    # (verdict Buy/Strong Buy), "all setups" = every R:R-valid setup regardless
+    # of verdict. Headline = buy; all-setups shown alongside for transparency.
+    BUY = "AND verdict IN ('Buy','Strong Buy')"
+    W30 = f"AND signal_date >= date('{max_d}', '-30 day')"
     track = {"generated": str(date.today()),
              "method": {"fill_rule": f"limit at entry, fills if Low touches within {FILL_WINDOW} sessions",
                         "expiry_days": EXPIRY_DAYS,
                         "conservative": "same-bar stop counts as a loss; targets only count on touch after fill",
-                        "universe": "R:R-gated valid setups only (setup_valid=1)"},
-             "last_30d": bucket(f"AND signal_date >= date('{max_d}', '-30 day')"),
+                        "universe": "Buy-rated = verdict Buy/Strong Buy AND R:R-valid; "
+                                    "all-setups = every R:R-valid setup regardless of verdict"},
+             "last_30d_buy": bucket(f"{W30} {BUY}"), "all_time_buy": bucket(BUY),
+             "last_30d": bucket(W30),
              "all_time": bucket(), "live_only": bucket("AND source='live'"),
              "backfill_note": "Rows marked 'backfill' are a simulated walk-forward replay of the "
                               "engine on historical data — not signals published in advance.",
              "open_signals": open_n,
+             "portfolio": simulate_portfolio(con),
              "weights": weights, "weights_log": get_calibration(con, "weights_log", [])[-5:],
              "ledger": ledger}
     (OUT / "track_record.json").write_text(json.dumps(track, default=str))
-    print(f"track record: {track['all_time']['trades']} trades all-time, "
-          f"30d win rate {track['last_30d']['win_rate_pct']}%")
+    print(f"track record: buy-rated {track['all_time_buy']['trades']} trades "
+          f"(30d win {track['last_30d_buy']['win_rate_pct']}%), "
+          f"all setups {track['all_time']['trades']} trades "
+          f"(30d win {track['last_30d']['win_rate_pct']}%)")
     return track
 
 

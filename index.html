@@ -94,8 +94,25 @@ footer{border-top:1px solid var(--line);padding:26px 0 40px;color:var(--tx3);fon
       Every published R:R-valid setup is frozen at publish time and scored against what the market
       actually did: <b>TP1/TP2</b> = target touched after a fill, <b>SL</b> = stop touched
       (same-bar stop counts as a loss), <b>Expired</b> = closed at market after 5 sessions,
-      <b>Not&nbsp;filled</b> = price never pulled back to the limit. No cherry-picking — misses stay on the board.</p>
+      <b>Not&nbsp;filled</b> = price never pulled back to the limit. No cherry-picking — misses stay on the board.
+      Two cuts are shown: <b>Buy signals</b> (setups on stocks the site rated Buy / Strong Buy — the trades
+      we'd actually recommend) and <b>All valid setups</b> (every setup that passed the 1:2 risk-reward
+      rule, even on Hold/Sell-rated stocks, shown for full transparency).</p>
     <div class="stats" id="trstats" style="margin:0 0 18px"></div>
+
+    <div id="perf" style="display:none;background:linear-gradient(160deg,#141d30,var(--card));border:1px solid var(--line);border-radius:16px;padding:20px;margin:0 0 18px">
+      <div style="display:flex;flex-wrap:wrap;align-items:center;gap:10px">
+        <h3 style="font-size:13px;text-transform:uppercase;letter-spacing:.09em;color:var(--tx3);font-weight:700;margin:0">If you followed the Buy signals — Rs 100,000 simulated</h3>
+        <div style="flex:1"></div>
+        <div id="pfwins" role="group" aria-label="Time window"></div>
+      </div>
+      <p id="pfheadline" style="font-size:16px;margin:12px 0 4px"></p>
+      <div style="display:flex;gap:16px;font-size:12px;color:var(--tx2);margin:0 0 8px" id="pflegend"></div>
+      <div style="position:relative"><canvas id="pfch" height="260" style="width:100%;height:260px"></canvas>
+        <div id="pftip" style="display:none;position:absolute;pointer-events:none;background:#0d1526;border:1px solid var(--line);border-radius:9px;padding:7px 10px;font-size:12px;white-space:nowrap;z-index:5"></div></div>
+      <p id="pfrules" style="color:var(--tx3);font-size:12px;margin-top:10px"></p>
+    </div>
+
     <div style="background:var(--card);border:1px solid var(--line);border-radius:16px;padding:6px 18px 14px;overflow-x:auto">
       <table style="width:100%;border-collapse:collapse;font-size:13px;min-width:760px">
         <thead><tr id="trhead"></tr></thead><tbody id="trbody"></tbody>
@@ -152,14 +169,17 @@ const OC={TP2:["TP2 hit","var(--up)"],TP1:["TP1 hit","var(--up)"],SL:["Stopped",
           EXPIRED:["Expired","var(--hold)"],NOT_FILLED:["Not filled","var(--tx3)"],VOID_CA:["Void (corp. action)","var(--tx3)"]};
 fetch("output/track_record.json").then(r=>{if(!r.ok)throw 0;return r.json()}).then(t=>{
   const s30=t.last_30d||{},all=t.all_time||{};
+  const b30=t.last_30d_buy||s30,ball=t.all_time_buy||all;   // fall back pre-upgrade
   if(!all.signals)return;
   document.getElementById("track").style.display="block";
+  const pc=x=>x!=null?x+"%":"—";
   const tile=(k,v,sub)=>`<div class="stat"><div class="k">${k}</div><div class="v">${v??"—"}</div>${sub?`<div class="k" style="margin-top:2px;text-transform:none;letter-spacing:0">${sub}</div>`:""}</div>`;
   document.getElementById("trstats").innerHTML=
-    tile("Win rate · 30d",s30.win_rate_pct!=null?s30.win_rate_pct+"%":"—",`${s30.wins||0}W / ${s30.losses||0}L of ${s30.trades||0} trades`)+
-    tile("Win rate · all time",all.win_rate_pct!=null?all.win_rate_pct+"%":"—",`${all.trades} trades from ${all.signals} signals`)+
-    tile("Avg return / trade",all.avg_return_pct!=null?all.avg_return_pct+"%":"—","incl. losses & expiries")+
-    tile("Avg days to win",all.avg_days_to_win??"—","sessions, fill → target")+
+    tile("Buy signals · 30d",pc(b30.win_rate_pct),`${b30.wins||0}W / ${b30.losses||0}L of ${b30.trades||0} trades · avg ${pc(b30.avg_return_pct)}`)+
+    tile("Buy signals · all time",pc(ball.win_rate_pct),`${ball.trades||0} trades from ${ball.signals||0} signals · avg ${pc(ball.avg_return_pct)}`)+
+    tile("All valid setups · 30d",pc(s30.win_rate_pct),`${s30.wins||0}W / ${s30.losses||0}L of ${s30.trades||0} trades · incl. Hold/Sell verdicts`)+
+    tile("All valid setups · all time",pc(all.win_rate_pct),`${all.trades} trades from ${all.signals} signals · avg ${pc(all.avg_return_pct)}`)+
+    tile("Avg days to win",ball.avg_days_to_win??all.avg_days_to_win??"—","sessions, fill → target")+
     tile("Open signals",t.open_signals??0,"awaiting outcome");
   document.getElementById("trhead").innerHTML=
     ["Symbol","Signal date","Verdict","Entry","SL","TP1","TP2","Outcome","Return","Days"]
@@ -183,7 +203,106 @@ fetch("output/track_record.json").then(r=>{if(!r.ok)throw 0;return r.json()}).th
     `Method: ${t.method?.fill_rule}; expiry after ${t.method?.expiry_days} sessions; ${t.method?.conservative}. `+
     ((t.ledger||[]).some(r=>r.source==="backfill")?`Rows marked SIM are a simulated historical replay of the same engine, shown for context. `:"")+
     (wl.length?`Latest calibration: ${wl[wl.length-1].reason} → weights auto-adjusted.`:"Signal weights: no calibration adjustment yet.");
+  initPerf(t.portfolio);
 }).catch(()=>{});
+
+/* ---------- performance: "growth of Rs 100k" equity curve ---------- */
+const PF={port:"#5988f2",bench:"#bd6e8b"};      // pair validated for CVD on dark surface
+let pfData=null,pfWin=30,pfPts=[];
+function initPerf(pf){
+  if(!pf||!pf.series||pf.series.length<2)return;          // old JSON / empty ledger -> card stays hidden
+  pfData=pf;
+  document.getElementById("perf").style.display="block";
+  const spanDays=(new Date(pf.series[pf.series.length-1][0])-new Date(pf.series[0][0]))/864e5;
+  const wins=[["30",30],["90",90],["All",1e5]].filter(([,d])=>d<1e5?spanDays>=d:true);
+  pfWin=wins.length>1?30:1e5;
+  document.getElementById("pfwins").innerHTML=wins.map(([l,d])=>
+    `<button class="chip${d===pfWin?" on":""}" data-w="${d}" style="padding:5px 13px;font-size:12px">${l==="All"?"All":l+"D"}</button>`).join(" ");
+  document.getElementById("pfwins").querySelectorAll(".chip").forEach(b=>b.onclick=()=>{
+    pfWin=+b.dataset.w;
+    document.getElementById("pfwins").querySelectorAll(".chip").forEach(x=>x.classList.toggle("on",x===b));
+    drawPerf();});
+  document.getElementById("pflegend").innerHTML=
+    `<span><i style="display:inline-block;width:18px;height:3px;background:${PF.port};border-radius:2px;vertical-align:middle;margin-right:6px"></i>Following our Buy signals</span>`+
+    `<span><i style="display:inline-block;width:18px;height:0;border-top:3px dashed ${PF.bench};vertical-align:middle;margin-right:6px"></i>KSE-100 (just holding the index)</span>`;
+  document.getElementById("pfrules").textContent="Simulation rules: "+pf.rules+
+    " Curve is marked at audited trade close. Shaded region = simulated walk-forward replay (SIM); unshaded = live published signals. "+
+    "Past performance does not guarantee future results — not investment advice.";
+  drawPerf();
+  window.addEventListener("resize",()=>pfData&&drawPerf());
+}
+function pfSlice(){
+  const s=pfData.series,last=new Date(s[s.length-1][0]);
+  let pts=pfWin>=1e5?s.slice():s.filter(r=>(last-new Date(r[0]))/864e5<=pfWin);
+  while(pts.length&&pts[0][2]==null)pts=pts.slice(1);      // drop leading points with no benchmark
+  if(pts.length<2)pts=s.slice(-2);
+  const e0=pts[0][1],k0=pts[0][2];
+  return pts.map(r=>[r[0],100000*r[1]/e0,k0&&r[2]!=null?100000*r[2]/k0:null]);
+}
+function drawPerf(){
+  pfPts=pfSlice();
+  const pts=pfPts,c=document.getElementById("pfch"),x=c.getContext("2d");
+  const W=c.width=c.offsetWidth*2,H=c.height=520;
+  const vals=pts.flatMap(r=>[r[1],r[2]]).filter(v=>v!=null);
+  const lo=Math.min(...vals)*.995,hi=Math.max(...vals)*1.005;
+  const PL=110,PR=30,PT=16,PB=44;
+  const X=i=>PL+(W-PL-PR)*i/(pts.length-1),Y=v=>PT+(H-PT-PB)*(1-(v-lo)/(hi-lo));
+  x.clearRect(0,0,W,H);
+  // SIM shading (before first live-resolved close)
+  const fl=pfData.first_live_close;
+  let simEnd=pts.length-1;
+  if(fl){simEnd=-1;for(let i=0;i<pts.length;i++)if(pts[i][0]<fl)simEnd=i;}
+  if(simEnd>=0){x.fillStyle="rgba(138,92,255,.055)";x.fillRect(X(0),PT,X(Math.min(simEnd+1,pts.length-1))-X(0),H-PT-PB);
+    x.fillStyle="#5a6a8f";x.font="19px Inter";x.fillText("SIM (replay)",X(0)+10,PT+24);}
+  // grid + y labels (recessive)
+  x.strokeStyle="#1e2a44";x.lineWidth=1;x.beginPath();
+  for(let g=0;g<5;g++){const y=PT+(H-PT-PB)*g/4;x.moveTo(PL,y);x.lineTo(W-PR,y);}x.stroke();
+  x.fillStyle="#5a6a8f";x.font="19px 'JetBrains Mono',monospace";
+  for(let g=0;g<5;g++)x.fillText("Rs "+fmt(Math.round(hi-(hi-lo)*g/4)),8,PT+6+(H-PT-PB)*g/4);
+  x.font="18px Inter";x.fillText(pts[0][0],PL,H-14);
+  const lastLab=pts[pts.length-1][0];x.fillText(lastLab,W-PR-x.measureText(lastLab).width,H-14);
+  // start baseline (Rs 100k)
+  if(100000>=lo&&100000<=hi){x.setLineDash([3,6]);x.strokeStyle="#2c3d63";x.beginPath();
+    x.moveTo(PL,Y(100000));x.lineTo(W-PR,Y(100000));x.stroke();x.setLineDash([]);}
+  // benchmark (dashed = secondary encoding, not colour-alone)
+  x.setLineDash([10,8]);x.strokeStyle=PF.bench;x.lineWidth=3;x.beginPath();
+  pts.forEach((r,i)=>{if(r[2]==null)return;i&&pts[i-1][2]!=null?x.lineTo(X(i),Y(r[2])):x.moveTo(X(i),Y(r[2]))});
+  x.stroke();x.setLineDash([]);
+  // portfolio line + soft area
+  const grad=x.createLinearGradient(0,0,0,H);grad.addColorStop(0,"rgba(89,136,242,.22)");grad.addColorStop(1,"rgba(89,136,242,0)");
+  x.beginPath();pts.forEach((r,i)=>i?x.lineTo(X(i),Y(r[1])):x.moveTo(X(i),Y(r[1])));
+  x.strokeStyle=PF.port;x.lineWidth=4;x.stroke();
+  x.lineTo(X(pts.length-1),H-PB);x.lineTo(X(0),H-PB);x.closePath();x.fillStyle=grad;x.fill();
+  // direct end labels (text ink + coloured dot)
+  const eEnd=pts[pts.length-1][1],kEnd=pts[pts.length-1][2];
+  const lab=(v,col,dy)=>{if(v==null)return;x.fillStyle=col;x.beginPath();x.arc(X(pts.length-1),Y(v),5,0,7);x.fill();
+    x.fillStyle="#e6ecf7";x.font="bold 19px Inter";const t="Rs "+fmt(Math.round(v));
+    x.fillText(t,Math.min(X(pts.length-1)+10,W-PR-x.measureText(t).width),Y(v)+dy);};
+  lab(eEnd,PF.port,eEnd>= (kEnd??-1e9)?-8:20);lab(kEnd,PF.bench,eEnd>=(kEnd??-1e9)?20:-8);
+  c.style.height="260px";
+  // headline
+  const ep=(eEnd/100000-1)*100,kp=kEnd!=null?(kEnd/100000-1)*100:null;
+  const wlab=pfWin>=1e5?"since tracking began":"last "+pfWin+" days";
+  document.getElementById("pfheadline").innerHTML=
+    `Rs 100,000 → <b style="color:${ep>=0?"var(--up)":"var(--dn)"}" class="mono">Rs ${fmt(Math.round(eEnd))}</b> `+
+    `(${ep>=0?"+":""}${ep.toFixed(2)}%) ${wlab}`+
+    (kp!=null?` · KSE-100 alone: <span class="mono">Rs ${fmt(Math.round(kEnd))}</span> (${kp>=0?"+":""}${kp.toFixed(2)}%)`:"")+
+    ` · <span style="color:var(--tx3)">${pfData.trades} audited trades</span>`;
+}
+// crosshair + tooltip
+(function(){const c=document.getElementById("pfch"),tip=document.getElementById("pftip");if(!c)return;
+c.addEventListener("mousemove",e=>{
+  if(!pfPts.length)return;
+  const r=c.getBoundingClientRect(),fx=(e.clientX-r.left)/r.width;
+  const PL=110/2,PR=30/2,w=r.width-PL-PR;               // css-px equivalents of canvas padding
+  const i=Math.max(0,Math.min(pfPts.length-1,Math.round((e.clientX-r.left-PL)/w*(pfPts.length-1))));
+  const[d,ev,kv]=pfPts[i];
+  tip.style.display="block";
+  tip.style.left=Math.min(e.clientX-r.left+14,r.width-190)+"px";tip.style.top="14px";
+  tip.innerHTML=`<b>${d}</b><br><span style="color:${PF.port}">●</span> Signals: Rs ${fmt(Math.round(ev))}`+
+    (kv!=null?`<br><span style="color:${PF.bench}">●</span> KSE-100: Rs ${fmt(Math.round(kv))}`:"");
+});
+c.addEventListener("mouseleave",()=>tip.style.display="none");})();
 document.getElementById("q").addEventListener("input",render);
 document.getElementById("sort").addEventListener("change",render);
 document.querySelectorAll(".chip").forEach(c=>c.onclick=()=>{document.querySelectorAll(".chip").forEach(x=>x.classList.remove("on"));c.classList.add("on");f=c.dataset.f;render();});
