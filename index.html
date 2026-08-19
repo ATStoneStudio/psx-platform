@@ -112,6 +112,8 @@ padding:17px;transition:transform .18s,border-color .18s,box-shadow .18s;positio
 .row b{color:var(--tx);font-weight:600}
 .tag{position:absolute;top:0;right:0;font-size:9.5px;font-weight:700;background:rgba(16,217,142,.16);color:var(--up);padding:4px 9px;border-bottom-left-radius:10px;letter-spacing:.03em}
 .tag.alt{background:rgba(139,152,184,.13);color:var(--tx2)}
+.shb{display:inline-flex;align-items:center;gap:4px;font-size:10px;font-weight:700;background:rgba(16,217,142,.11);
+color:#5fd6a6;border:1px solid rgba(16,217,142,.28);border-radius:99px;padding:2px 8px;letter-spacing:.02em;white-space:nowrap}
 .more{display:flex;justify-content:center;padding:4px 0 8px}
 .morebtn{background:var(--card);border:1px solid var(--line2);border-radius:99px;padding:0 26px;height:var(--tap);
 font-weight:600;font-size:14px;cursor:pointer;color:var(--tx2)}
@@ -170,6 +172,7 @@ footer{border-top:1px solid var(--line);margin-top:40px;padding:26px 0 calc(40px
 <header><div class="wrap nav">
   <a class="logo" href="index.html"><div class="dot">📈</div>PSX <span class="g">Edge</span></a>
   <span class="badge" id="asof">—</span><div class="sp"></div>
+  <a class="badge" href="plan.html" style="border-color:var(--acc);color:var(--acc)">🧮 Plan my month</a>
   <div class="tickers" id="tickers"></div>
 </div></header>
 <div class="tkbar"><div class="in" id="tickers2"></div></div>
@@ -201,6 +204,7 @@ footer{border-top:1px solid var(--line);margin-top:40px;padding:26px 0 calc(40px
     <div class="chiprow" role="group" aria-label="Filter">
       <button class="chip on" data-f="all">All</button>
       <button class="chip" data-f="valid">✓ Buy setups</button>
+      <button class="chip" data-f="shariah">☾ Shariah ✓</button>
       <button class="chip" data-f="Strong Buy">Strong Buy</button>
       <button class="chip" data-f="buy">Buy (incl. Strong)</button>
       <button class="chip" data-f="Hold">Hold</button>
@@ -245,7 +249,7 @@ footer{border-top:1px solid var(--line);margin-top:40px;padding:26px 0 calc(40px
   <div class="warn" style="margin-top:34px">⚠️ Automated technical analysis for information only — <b>not investment advice</b>. Signals are probabilities, never guarantees. Place and manage every order yourself in your broker terminal.</div>
 </main>
 
-<footer><div class="wrap">PSX Edge · Data: Pakistan Stock Exchange EOD · Analysis is fully algorithmic (pivot points, Fibonacci retracements, momentum, market structure) with zero manual input. Past performance does not guarantee future results. Not registered investment advice under SECP regulations.<span id="excl"></span></div></footer>
+<footer><div class="wrap">PSX Edge · Data: Pakistan Stock Exchange EOD · Analysis is fully algorithmic (pivot points, Fibonacci retracements, momentum, market structure) with zero manual input. Past performance does not guarantee future results. Not registered investment advice under SECP regulations.<span id="shnote"></span><span id="excl"></span></div></footer>
 
 <script>
 const $=s=>document.querySelector(s),$$=s=>[...document.querySelectorAll(s)];
@@ -275,6 +279,8 @@ fetch("output/summary.json").then(r=>r.json()).then(d=>{
   $("#tickers").innerHTML=tk;$("#tickers2").innerHTML=tk;
   if(d.regime==="Risk-Off")$("#regimewarn").innerHTML=
     '<div class="warn" style="margin-top:18px">🔻 <b>Risk-Off regime:</b> the KSE-100 is below its 50-day average, so every score is being reduced by the market-regime filter. Expect fewer and weaker buy signals until the index reclaims its trend.</div>';
+  if(d.shariah_as_of)document.getElementById("shnote").textContent=
+    ` · Shariah status mirrors the PSX KMI All Share Index (screening by Al Meezan's Shariah Supervisory Board), as of ${d.shariah_as_of}. We do not screen stocks ourselves; a stock without the badge is simply not in that index. Verify with your own scholar before investing.`;
   const ex=d.excluded_stale||{};
   if(Object.keys(ex).length)$("#excl").textContent=" · Excluded (no fresh data): "+Object.keys(ex).join(", ");
   renderPicks();render();
@@ -296,7 +302,7 @@ function renderPicks(){
   $("#picks").innerHTML=top.map((x,i)=>`
     <a class="pick" href="stock.html?s=${x.symbol}">
       <div class="rank">#${i+1}</div>
-      <div class="sym">${x.symbol}</div>
+      <div class="sym">${x.symbol}${x.shariah?' <span class="shb">Shariah ✓</span>':""}</div>
       <div class="why">${x.verdict} · score ${x.score}/10 · ${x.structure} structure${x.est_days_tp1?` · ~${x.est_days_tp1}d to TP1`:""}</div>
       <div class="lvls">
         <div class="lvl"><div class="k">Buy at</div><div class="v mono">${fmt(x.primary_buy)}</div></div>
@@ -314,7 +320,8 @@ $("#sort").addEventListener("change",render);
 function render(){
   const q=$("#q").value.toUpperCase(),s=$("#sort").value;
   let rows=DATA.filter(x=>!q||x.symbol.includes(q)||(x.sector||"").toUpperCase().includes(q));
-  if(f==="valid")rows=rows.filter(x=>x.setup_valid&&/Buy/.test(x.verdict));
+  if(f==="shariah")rows=rows.filter(x=>x.shariah);
+  else if(f==="valid")rows=rows.filter(x=>x.setup_valid&&/Buy/.test(x.verdict));
   else if(f==="sell")rows=rows.filter(x=>x.verdict.includes("Sell"));
   else if(f==="buy")rows=rows.filter(x=>x.verdict.includes("Buy"));      /* incl. Strong Buy */
   else if(f!=="all")rows=rows.filter(x=>x.verdict===f);
@@ -326,7 +333,7 @@ function render(){
     ${x.setup_valid?(/Buy/.test(x.verdict)
       ?'<div class="tag">BUY SETUP ✓</div>'
       :'<div class="tag alt" title="Passed the 1:2 risk-reward maths, but we do not rate this stock a buy — so it is not featured as a setup.">R:R only</div>'):""}
-    <div class="top"><div><div class="sym">${x.symbol}</div><div class="struct">${x.structure} structure</div></div>
+    <div class="top"><div><div class="sym">${x.symbol}${x.shariah?' <span class="shb" title="Listed in the PSX KMI All Share Index — screened as Shariah-compliant by Al Meezan\'s Shariah Supervisory Board.">Shariah ✓</span>':""}</div><div class="struct">${x.structure} structure</div></div>
     <span class="verdict ${V[x.verdict]||"v-h"}">${x.verdict.toUpperCase()}</span></div>
     <div class="price mono">Rs ${fmt(x.close)}</div>
     <div class="meter"><i style="width:${x.score*10}%;background:${mc(x.score)}"></i></div>

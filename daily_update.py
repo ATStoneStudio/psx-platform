@@ -24,6 +24,27 @@ CALIB_STEP = 0.05        # weight moved per calibration adjustment
 CALIB_COOLDOWN_DAYS = 7  # min calendar days between weight adjustments
 
 
+def load_shariah():
+    """Mirror of the PSX KMI All Share constituents (see shariah.txt header).
+    We never screen stocks ourselves. Returns (set_of_symbols, as_of_date_or_None).
+    Missing/unreadable file => empty set => no badge anywhere (fail safe, never
+    labels a stock compliant on a guess)."""
+    f = ROOT / "shariah.txt"
+    if not f.exists():
+        print("shariah.txt missing — Shariah badges disabled", file=sys.stderr)
+        return set(), None
+    syms, as_of = set(), None
+    for line in f.read_text().splitlines():
+        line = line.split("#")[0].strip()
+        if not line:
+            continue
+        if line.upper().startswith("AS_OF"):
+            as_of = line.split("=", 1)[-1].strip()
+            continue
+        syms.add(line.upper())
+    return syms, as_of
+
+
 def fetch_eod(symbols):
     import psxdata
     con = sqlite3.connect(DB)
@@ -369,6 +390,8 @@ def run_engine():
     evaluate_predictions(con)                      # resolve yesterday's signals first
     weights, calib_stats, calib_n = calibrate_weights(con)
     macro_ctx = load_macro_context(con)
+    shariah, shariah_as_of = load_shariah()
+    print(f"shariah list: {len(shariah)} symbols (as of {shariah_as_of})")
     symbols = [r[0] for r in con.execute(
         "SELECT DISTINCT symbol FROM ohlcv WHERE date LIKE '____-__-__'")]
     OUT.mkdir(exist_ok=True)
@@ -392,6 +415,8 @@ def run_engine():
                 continue
             res = analyze(sym, df, context=macro_ctx, weights=weights)
             res["corporate_actions_adjusted"] = ca_events
+            res["shariah_compliant"] = sym in shariah
+            res["shariah_as_of"] = shariah_as_of
             res["price_history"] = [[d.strftime("%Y-%m-%d"), round(float(c), 2)] for d, c in df["Close"].tail(120).items()]
             (OUT / f"{sym}.json").write_text(json.dumps(res, default=str))
             log_prediction(con, res)               # audit trail: freeze today's levels
@@ -401,6 +426,7 @@ def run_engine():
                             "score": res["verdict"]["composite_score"],
                             "structure": res["market_structure"],
                             "sector": res["macro_context"]["sector"],
+                            "shariah": sym in shariah,
                             "macro_adj": res["macro_context"]["adjustment"],
                             "setup_valid": res["order_table"]["setup_valid_rr_rule"],
                             "primary_buy": res["order_table"]["primary_buy_limit"],
@@ -422,6 +448,8 @@ def run_engine():
     (OUT / "summary.json").write_text(json.dumps(
         {"generated": str(date.today()), "stocks": summary, "excluded_stale": stale,
          "regime": regime, "weights": weights,
+         "shariah_as_of": shariah_as_of,
+         "shariah_source": "PSX KMI All Share Index constituents (screening by Al Meezan Shariah Supervisory Board). We do not screen stocks ourselves.",
          "calibration": {"resolved_30d": calib_n, "component_stats": calib_stats},
          "macro": dict(con.execute("SELECT series, value FROM macro WHERE (series, date) IN (SELECT series, MAX(date) FROM macro GROUP BY series)"))}, default=str))
     write_track_record(con)

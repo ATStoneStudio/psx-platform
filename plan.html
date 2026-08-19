@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html lang="en"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#070b14">
+<title>PSX Edge — Plan my month</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#070b14;--card:#101828;--card2:#141d30;--line:#1e2a44;--line2:#2c3d63;
+--tx:#e6ecf7;--tx2:#8b98b8;--tx3:#5a6a8f;--up:#10d98e;--dn:#ff5470;--hold:#f5b950;--acc:#4f7cff;
+--grad:linear-gradient(135deg,#4f7cff,#8a5cff 55%,#c44dff);--r:16px;--tap:44px;--pad:clamp(16px,4vw,24px)}
+*{box-sizing:border-box;margin:0;padding:0}
+html{-webkit-text-size-adjust:100%}
+body{background:var(--bg);color:var(--tx);font:15px/1.55 Inter,system-ui,-apple-system,sans-serif;-webkit-font-smoothing:antialiased;overflow-x:hidden}
+a{color:inherit;text-decoration:none}button,input,select{font:inherit;color:inherit}
+.mono{font-family:'JetBrains Mono',ui-monospace,monospace;font-variant-numeric:tabular-nums}
+.wrap{max-width:1080px;margin:0 auto;padding:0 var(--pad)}
+:focus-visible{outline:2px solid var(--acc);outline-offset:2px;border-radius:6px}
+header{position:sticky;top:0;z-index:60;backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);
+background:rgba(7,11,20,.85);border-bottom:1px solid var(--line);padding-top:env(safe-area-inset-top)}
+.nav{display:flex;align-items:center;gap:12px;height:58px}
+.logo{display:flex;align-items:center;gap:9px;font-weight:800;font-size:16px;letter-spacing:-.02em}
+.logo .dot{width:27px;height:27px;border-radius:8px;background:var(--grad);display:grid;place-items:center;font-size:13px}
+.g{background:var(--grad);-webkit-background-clip:text;background-clip:text;color:transparent}
+.back{color:var(--tx2);font-size:13px;border:1px solid var(--line);border-radius:99px;padding:0 15px;height:36px;display:inline-flex;align-items:center;white-space:nowrap}
+.back:hover{color:var(--tx);border-color:var(--line2)}
+h1{font-size:clamp(26px,5vw,38px);font-weight:800;letter-spacing:-.03em;line-height:1.12;padding-top:clamp(24px,4vw,36px)}
+.lede{color:var(--tx2);max-width:64ch;margin-top:12px;font-size:15px}
+.card{background:linear-gradient(160deg,var(--card2),var(--card));border:1px solid var(--line);border-radius:var(--r);padding:clamp(16px,3vw,22px);margin:16px 0}
+.card h3{font-size:12.5px;text-transform:uppercase;letter-spacing:.09em;color:var(--tx3);margin-bottom:14px;font-weight:700}
+.form{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,180px),1fr));gap:11px}
+.fld{background:#0d1526;border:1px solid var(--line);border-radius:12px;padding:9px 13px}
+.fld label{font-size:10.5px;color:var(--tx3);text-transform:uppercase;letter-spacing:.06em;font-weight:700;display:block}
+.fld input,.fld select{width:100%;background:transparent;border:0;outline:none;font-weight:700;font-size:16px;padding:5px 0 3px}
+.fld input{font-family:'JetBrains Mono',monospace}
+.fld:focus-within{border-color:var(--acc)}
+.chk{display:flex;align-items:center;gap:10px;background:#0d1526;border:1px solid var(--line);border-radius:12px;padding:12px 13px;min-height:var(--tap);cursor:pointer}
+.chk input{width:18px;height:18px;accent-color:var(--acc);flex-shrink:0}
+.chk span{font-size:13px;color:var(--tx2)}
+.scen{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,210px),1fr));gap:12px}
+.sc{border-radius:14px;padding:16px;border:1px solid var(--line);background:#0d1526}
+.sc.bad{border-color:rgba(255,84,112,.4);background:rgba(255,84,112,.07)}
+.sc.mid{border-color:rgba(79,124,255,.4);background:rgba(79,124,255,.08)}
+.sc.good{border-color:rgba(16,217,142,.35);background:rgba(16,217,142,.06)}
+.sc .k{font-size:11px;text-transform:uppercase;letter-spacing:.07em;font-weight:700;color:var(--tx3)}
+.sc .v{font-size:clamp(21px,3.6vw,27px);font-weight:800;margin:6px 0 2px}
+.sc .n{font-size:12.5px;color:var(--tx2);line-height:1.5}
+table.al{width:100%;border-collapse:collapse;font-size:13.5px;min-width:640px}
+table.al th{color:var(--tx3);font-size:10.5px;text-transform:uppercase;letter-spacing:.07em;padding:11px 8px;border-bottom:1px solid var(--line);text-align:left;white-space:nowrap}
+table.al td{padding:12px 8px;border-bottom:1px solid var(--line);white-space:nowrap}
+table.al th.r,table.al td.r{text-align:right}
+.tblwrap{overflow-x:auto}
+.alcards{display:none;flex-direction:column;gap:10px}
+.alcard{background:#0d1526;border:1px solid var(--line);border-radius:13px;padding:14px}
+.alcard .h{display:flex;justify-content:space-between;align-items:center;gap:8px}
+.alcard .s{font-weight:800;font-size:16px}
+.alcard .gr{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:11px}
+.alcard .gr div{font-size:11px;color:var(--tx3)}
+.alcard .gr b{display:block;color:var(--tx);font-weight:700;font-size:13.5px;margin-top:2px}
+@media(max-width:720px){.tblwrap{display:none}.alcards{display:flex}}
+.shb{display:inline-flex;align-items:center;font-size:10px;font-weight:700;background:rgba(16,217,142,.11);color:#5fd6a6;border:1px solid rgba(16,217,142,.28);border-radius:99px;padding:2px 7px;white-space:nowrap}
+.warn{background:rgba(245,185,80,.07);border:1px solid rgba(245,185,80,.25);border-radius:13px;padding:14px 16px;font-size:13px;color:#d8c08a;line-height:1.6;margin:16px 0}
+.crit{background:rgba(255,84,112,.07);border:1px solid rgba(255,84,112,.3);border-radius:13px;padding:14px 16px;font-size:13px;color:#ffa8b8;line-height:1.6;margin:16px 0}
+.fine{color:var(--tx3);font-size:12px;line-height:1.65;margin-top:10px}
+.empty{background:var(--card);border:1px dashed var(--line2);border-radius:var(--r);padding:22px;color:var(--tx2);font-size:14px;line-height:1.65}
+footer{border-top:1px solid var(--line);margin-top:40px;padding:24px 0 calc(40px + env(safe-area-inset-bottom));color:var(--tx3);font-size:12.5px;line-height:1.7}
+@media(prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+</style></head><body>
+<header><div class="wrap nav">
+  <a class="logo" href="index.html"><div class="dot">📈</div>PSX <span class="g">Edge</span></a>
+  <div style="flex:1"></div><a class="back" href="index.html">← All stocks</a>
+</div></header>
+
+<div class="wrap">
+<h1>Plan my month</h1>
+<p class="lede">Tell us your budget and how much you're willing to risk. We'll divide it across today's qualifying setups
+by <b>equal risk</b> — not equal money — so no single trade can hurt you more than the others, and show you what
+happens in the good case, the bad case, and the case where history repeats.</p>
+
+<div class="crit"><b>We cannot tell you what you will earn.</b> Nobody can. Roughly 4 in 10 of our signals
+make money; the profit shown below is a range of outcomes based on our published track record, not a forecast
+and not a promise. The only number here that is knowable in advance is the worst case — so read that one first.</div>
+
+<div class="card"><h3>Your plan</h3>
+<div class="form">
+  <div class="fld"><label for="cap">Monthly budget (PKR)</label><input id="cap" type="number" inputmode="numeric" min="1000" step="5000" value="100000"></div>
+  <div class="fld"><label for="risk">Risk per trade (%)</label><input id="risk" type="number" inputmode="decimal" min="0.25" max="5" step="0.25" value="2"></div>
+  <div class="fld"><label for="maxpos">Max trades at once</label><select id="maxpos">
+    <option value="3">3</option><option value="4">4</option><option value="5" selected>5</option><option value="6">6</option><option value="8">8</option></select></div>
+  <label class="chk" for="shonly"><input type="checkbox" id="shonly"><span>Shariah-compliant only</span></label>
+</div>
+<p class="fine" id="riskline"></p></div>
+
+<div id="out"><div class="empty">Loading today's setups…</div></div>
+
+<div class="card"><h3>How this works</h3>
+<p style="color:var(--tx2);font-size:13.5px;line-height:1.7">
+<b>Equal risk, not equal money.</b> Each trade is sized so that if its stop-loss is hit, you lose the same
+rupee amount — your chosen % of budget. A volatile stock therefore gets fewer shares than a steady one.<br><br>
+<b>Deploy as signals appear.</b> We only publish a setup when the reward is at least twice the risk, which is
+usually a handful of stocks a day and sometimes none at all. You are not meant to invest the whole budget today —
+keep the rest in cash and add positions as they qualify.<br><br>
+<b>One sector cap.</b> No more than two positions from the same sector, so one bad sector cannot take out your month.<br><br>
+<b>Every number below traces to the public ledger.</b> The "if history repeats" figure uses our audited win rate
+and average return per trade — including every loss. <a href="index.html#track" style="color:var(--acc)">Check the record yourself →</a></p></div>
+
+<div class="warn">⚠️ Automated analysis for information only — <b>not investment advice</b> and not a managed portfolio.
+You place, size and exit every order yourself in your own broker account. Markets can move against all positions at once.
+Never invest money you cannot afford to lose.</div>
+</div>
+
+<footer><div class="wrap">PSX Edge · Allocation is arithmetic on published levels, not advice. Past performance does not guarantee future results. Not registered investment advice under SECP regulations.<span id="shsrc"></span></div></footer>
+
+<script>
+const $=s=>document.querySelector(s);
+const fmt=n=>Number(n).toLocaleString("en-PK",{maximumFractionDigits:2});
+const R=n=>Math.round(n).toLocaleString("en-PK");
+let STOCKS=[],TR=null,SHASOF=null;
+
+Promise.all([
+  fetch("output/summary.json").then(r=>r.json()),
+  fetch("output/track_record.json").then(r=>r.ok?r.json():null).catch(()=>null)
+]).then(([s,t])=>{
+  STOCKS=s.stocks||[];TR=t;SHASOF=s.shariah_as_of;
+  if(s.shariah_as_of)$("#shsrc").textContent=` · Shariah status mirrors the PSX KMI All Share Index (screened by Al Meezan's Shariah Supervisory Board), as of ${s.shariah_as_of}.`;
+  ["cap","risk","maxpos","shonly"].forEach(id=>$("#"+id).addEventListener("input",build));
+  build();
+}).catch(()=>$("#out").innerHTML='<div class="empty">Could not load today\'s data. Please refresh.</div>');
+
+function build(){
+  const cap=Math.max(0,+$("#cap").value||0), rp=Math.min(5,Math.max(.25,+$("#risk").value||2));
+  const maxPos=+$("#maxpos").value, shOnly=$("#shonly").checked;
+  const perTradeRisk=cap*rp/100;
+  $("#riskline").textContent=`At ${rp}% per trade you are risking about Rs ${R(perTradeRisk)} on each position — `+
+    `if ${maxPos} positions were all stopped out at once you would lose about Rs ${R(perTradeRisk*maxPos)} `+
+    `(${(rp*maxPos).toFixed(1)}% of your budget). That is the number to be comfortable with before starting.`;
+
+  // qualifying = Buy-rated AND passes the 1:2 R:R rule (same rule as the site's featured setups)
+  let pool=STOCKS.filter(x=>x.setup_valid&&/Buy/.test(x.verdict));
+  if(shOnly)pool=pool.filter(x=>x.shariah);
+  pool.sort((a,b)=>b.score-a.score);
+
+  // sector cap: max 2 per sector
+  const seen={},picks=[];
+  for(const x of pool){const k=x.sector||"Other";if((seen[k]||0)>=2)continue;seen[k]=(seen[k]||0)+1;picks.push(x);if(picks.length>=maxPos)break}
+
+  if(!picks.length){
+    const anyValid=STOCKS.filter(x=>x.setup_valid).length;
+    $("#out").innerHTML=`<div class="empty"><b>No qualifying setup today${shOnly?" among Shariah-compliant stocks":""}.</b><br>
+      This is normal — we only allocate to stocks we rate a buy <i>and</i> whose levels offer at least twice as much
+      reward as risk. ${anyValid?`(${anyValid} setup${anyValid>1?"s":""} passed the risk-reward maths today but sit on stocks we rate Hold or Sell, so we exclude them.)`:""}
+      <br><br>Keep your Rs ${R(cap)} in cash and check back after the next market close — your plan below will fill in as setups appear.
+      Waiting is a position too.</div>`;
+    return;
+  }
+
+  // size each: shares = perTradeRisk / (entry - stop), capped by an equal share of budget
+  const budgetSlot=cap/maxPos;
+  let rows=picks.map(x=>{
+    const risk=x.primary_buy-x.stop_loss;
+    let sh=risk>0?Math.floor(perTradeRisk/risk):0;
+    const afford=Math.floor(budgetSlot/x.primary_buy);
+    const capped=sh>afford; sh=Math.min(sh,afford);
+    return {...x,shares:sh,cost:sh*x.primary_buy,riskAmt:sh*risk,
+            gain1:sh*(x.tp1-x.primary_buy),capped};
+  }).filter(r=>r.shares>0);
+
+  if(!rows.length){$("#out").innerHTML=`<div class="empty"><b>Your budget is too small for these setups.</b><br>
+    At Rs ${R(cap)} split across ${maxPos} positions you cannot afford a single share at today's prices.
+    Try fewer simultaneous trades, or a larger budget.</div>`;return}
+
+  const deployed=rows.reduce((a,r)=>a+r.cost,0), atRisk=rows.reduce((a,r)=>a+r.riskAmt,0);
+  const bestCase=rows.reduce((a,r)=>a+r.gain1,0);
+
+  // "if history repeats" — from the audited Buy-rated record, incl. losses
+  const b=(TR&&(TR.all_time_buy||TR.last_30d_buy))||null;
+  const wr=b&&b.win_rate_pct!=null?b.win_rate_pct:null, avg=b&&b.avg_return_pct!=null?b.avg_return_pct:null;
+  const histPnl=avg!=null?deployed*avg/100:null;
+
+  $("#out").innerHTML=`
+  <div class="card"><h3>What could happen</h3>
+    <div class="scen">
+      <div class="sc bad"><div class="k">Worst case — all stopped out</div>
+        <div class="v mono" style="color:var(--dn)">−Rs ${R(atRisk)}</div>
+        <div class="n">The only number knowable in advance. This happens if every position hits its stop-loss.
+        It assumes you actually place the stop orders.</div></div>
+      <div class="sc mid"><div class="k">If history repeats</div>
+        <div class="v mono">${histPnl==null?"—":(histPnl>=0?"+":"−")+"Rs "+R(Math.abs(histPnl))}</div>
+        <div class="n">${wr!=null?`Based on our audited record: ${wr}% of Buy signals won, averaging ${avg>=0?"+":""}${avg}% per trade including losses.`:"Not enough audited trades yet to estimate."}
+        An estimate from past results — <b>not a forecast</b>.</div></div>
+      <div class="sc good"><div class="k">Good case — all reach first target</div>
+        <div class="v mono" style="color:var(--up)">+Rs ${R(bestCase)}</div>
+        <div class="n">Every position reaching TP1. Historically only about ${wr!=null?wr:"40"}% of trades get there,
+        so treat this as a ceiling, not an expectation.</div></div>
+    </div>
+    <p class="fine">Deploying <b>Rs ${R(deployed)}</b> of your Rs ${R(cap)} today across ${rows.length} position${rows.length>1?"s":""}
+    — the remaining <b>Rs ${R(cap-deployed)}</b> stays in cash for setups that appear later this month.</p>
+  </div>
+
+  <div class="card"><h3>Your orders — place these yourself</h3>
+    <div class="tblwrap"><table class="al">
+      <thead><tr><th>Stock</th><th>Sector</th><th class="r">Shares</th><th class="r">Buy limit</th><th class="r">Stop loss</th><th class="r">Target 1</th><th class="r">Cost</th><th class="r">Risk</th></tr></thead>
+      <tbody>${rows.map(r=>`<tr>
+        <td><a href="stock.html?s=${r.symbol}" style="font-weight:700">${r.symbol}</a>${r.shariah?' <span class="shb">Shariah ✓</span>':""}</td>
+        <td style="color:var(--tx2)">${r.sector||"—"}</td>
+        <td class="r mono"><b>${R(r.shares)}</b></td>
+        <td class="r mono">${fmt(r.primary_buy)}</td>
+        <td class="r mono" style="color:var(--dn)">${fmt(r.stop_loss)}</td>
+        <td class="r mono" style="color:var(--up)">${fmt(r.tp1)}</td>
+        <td class="r mono">Rs ${R(r.cost)}</td>
+        <td class="r mono" style="color:var(--dn)">−Rs ${R(r.riskAmt)}</td></tr>`).join("")}</tbody>
+    </table></div>
+    <div class="alcards">${rows.map(r=>`<div class="alcard">
+      <div class="h"><div><span class="s">${r.symbol}</span>${r.shariah?' <span class="shb">Shariah ✓</span>':""}
+        <div style="font-size:11.5px;color:var(--tx3);margin-top:2px">${r.sector||""} · ${r.verdict}</div></div>
+        <div style="text-align:right"><div class="mono" style="font-weight:800;font-size:18px">${R(r.shares)}</div>
+        <div style="font-size:11px;color:var(--tx3)">shares</div></div></div>
+      <div class="gr"><div>Buy at<b class="mono">${fmt(r.primary_buy)}</b></div>
+        <div>Stop<b class="mono" style="color:var(--dn)">${fmt(r.stop_loss)}</b></div>
+        <div>Target<b class="mono" style="color:var(--up)">${fmt(r.tp1)}</b></div></div>
+      <div class="gr" style="grid-template-columns:repeat(2,1fr)"><div>Cost<b class="mono">Rs ${R(r.cost)}</b></div>
+        <div>You risk<b class="mono" style="color:var(--dn)">−Rs ${R(r.riskAmt)}</b></div></div>
+      <a href="stock.html?s=${r.symbol}" style="color:var(--acc);font-size:12.5px;display:inline-block;margin-top:10px">See full analysis →</a>
+    </div>`).join("")}</div>
+    <p class="fine">Place the <b>buy limit and the stop-loss together</b> in your broker app. A stop you didn't enter
+    protects nothing — that is the single most common way these plans fail.
+    ${rows.some(r=>r.capped)?"<br>Some positions were reduced to fit your per-trade budget, so their actual risk is below your limit.":""}</p>
+  </div>`;
+}
+</script></body></html>
