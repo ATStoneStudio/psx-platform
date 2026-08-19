@@ -1,309 +1,484 @@
 <!DOCTYPE html>
 <html lang="en"><head>
-<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#070b14">
+<meta name="description" content="Daily KSE-100 trading levels — entry, stop-loss and targets computed fresh every market close. Every signal publicly audited.">
 <title>PSX Edge — KSE-100 Daily Trading Signals</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
 <style>
-:root{--bg:#070b14;--bg2:#0c1220;--card:#101828;--card2:#141d30;--line:#1e2a44;--tx:#e6ecf7;--tx2:#8b98b8;--tx3:#5a6a8f;
---up:#10d98e;--up2:#0aa06a;--dn:#ff5470;--hold:#f5b950;--acc:#4f7cff;--acc2:#8a5cff;
---grad:linear-gradient(135deg,#4f7cff,#8a5cff 55%,#c44dff)}
+:root{
+--bg:#070b14;--bg2:#0c1220;--card:#101828;--card2:#141d30;--line:#1e2a44;--line2:#2c3d63;
+--tx:#e6ecf7;--tx2:#8b98b8;--tx3:#5a6a8f;
+--up:#10d98e;--dn:#ff5470;--hold:#f5b950;--acc:#4f7cff;--acc2:#8a5cff;
+--grad:linear-gradient(135deg,#4f7cff,#8a5cff 55%,#c44dff);
+--r:16px;--tap:44px;
+--pad:clamp(16px,4vw,24px);
+}
 *{box-sizing:border-box;margin:0;padding:0}
-body{background:var(--bg);color:var(--tx);font:15px/1.55 Inter,system-ui,sans-serif;-webkit-font-smoothing:antialiased}
+html{-webkit-text-size-adjust:100%;scroll-behavior:smooth}
+body{background:var(--bg);color:var(--tx);font:15px/1.55 Inter,system-ui,-apple-system,sans-serif;-webkit-font-smoothing:antialiased;overflow-x:hidden}
 a{color:inherit;text-decoration:none}
-.mono{font-family:'JetBrains Mono',monospace}
-.wrap{max-width:1240px;margin:0 auto;padding:0 24px}
-/* header */
-header{position:sticky;top:0;z-index:50;backdrop-filter:blur(14px);background:rgba(7,11,20,.75);border-bottom:1px solid var(--line)}
-.nav{display:flex;align-items:center;gap:14px;height:62px}
-.logo{display:flex;align-items:center;gap:10px;font-weight:800;font-size:18px;letter-spacing:-.02em}
-.logo .dot{width:30px;height:30px;border-radius:9px;background:var(--grad);display:grid;place-items:center;font-size:15px}
-.badge{font-size:11px;font-weight:600;color:var(--tx2);border:1px solid var(--line);padding:3px 9px;border-radius:99px}
+button,input,select{font:inherit;color:inherit}
+.mono{font-family:'JetBrains Mono',ui-monospace,monospace;font-variant-numeric:tabular-nums}
+.wrap{max-width:1240px;margin:0 auto;padding:0 var(--pad)}
+:focus-visible{outline:2px solid var(--acc);outline-offset:2px;border-radius:6px}
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+
+/* ---------- header ---------- */
+header{position:sticky;top:0;z-index:60;backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);
+background:rgba(7,11,20,.82);border-bottom:1px solid var(--line);padding-top:env(safe-area-inset-top)}
+.nav{display:flex;align-items:center;gap:12px;height:60px}
+.logo{display:flex;align-items:center;gap:9px;font-weight:800;font-size:17px;letter-spacing:-.02em;flex-shrink:0}
+.logo .dot{width:29px;height:29px;border-radius:9px;background:var(--grad);display:grid;place-items:center;font-size:14px}
+.g{background:var(--grad);-webkit-background-clip:text;background-clip:text;color:transparent}
+.badge{font-size:11px;font-weight:600;color:var(--tx2);border:1px solid var(--line);padding:3px 9px;border-radius:99px;white-space:nowrap}
 .nav .sp{flex:1}
-.tickers{display:flex;gap:18px;font-size:12.5px;color:var(--tx2)}
+.tickers{display:flex;gap:16px;font-size:12.5px;color:var(--tx2);white-space:nowrap}
 .tickers b{color:var(--tx);font-weight:600}
-/* hero */
-.hero{position:relative;padding:64px 0 36px;overflow:hidden}
-.hero::before{content:"";position:absolute;inset:-40% -10% auto;height:520px;
-background:radial-gradient(600px 300px at 25% 20%,rgba(79,124,255,.22),transparent 65%),radial-gradient(500px 280px at 75% 10%,rgba(196,77,255,.16),transparent 65%);pointer-events:none}
-.hero h1{font-size:clamp(30px,4.5vw,46px);font-weight:800;letter-spacing:-.035em;line-height:1.12;max-width:720px}
-.hero h1 .g{background:var(--grad);-webkit-background-clip:text;background-clip:text;color:transparent}
-.hero p{color:var(--tx2);max-width:640px;margin-top:14px;font-size:16px}
-.stats{display:flex;flex-wrap:wrap;gap:12px;margin-top:26px}
-.stat{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px 20px;min-width:150px}
-.stat .k{font-size:11.5px;color:var(--tx3);text-transform:uppercase;letter-spacing:.08em;font-weight:600}
-.stat .v{font-size:21px;font-weight:700;margin-top:3px}
-/* controls */
-.controls{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin:30px 0 18px}
-.search{flex:1;min-width:220px;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:11px 16px;color:var(--tx);font:inherit;outline:none;transition:.2s}
+.tkbar{display:none;border-bottom:1px solid var(--line);background:var(--bg2)}
+.tkbar .in{display:flex;gap:18px;padding:9px var(--pad);font-size:12px;color:var(--tx2);overflow-x:auto;scrollbar-width:none}
+.tkbar .in>span{white-space:nowrap;flex-shrink:0}
+.tkbar .in::-webkit-scrollbar{display:none}
+.tkbar b{color:var(--tx)}
+@media(max-width:860px){.tickers{display:none}.tkbar{display:block}}
+
+/* ---------- hero ---------- */
+.hero{position:relative;padding:clamp(34px,7vw,60px) 0 8px;overflow:hidden}
+.hero::before{content:"";position:absolute;inset:-40% -10% auto;height:520px;pointer-events:none;
+background:radial-gradient(600px 300px at 25% 20%,rgba(79,124,255,.2),transparent 65%),radial-gradient(500px 280px at 75% 10%,rgba(196,77,255,.14),transparent 65%)}
+.hero h1{font-size:clamp(28px,5.2vw,46px);font-weight:800;letter-spacing:-.035em;line-height:1.1;max-width:16ch}
+.hero .lede{color:var(--tx2);max-width:60ch;margin-top:14px;font-size:clamp(14.5px,1.6vw,16.5px)}
+.trust{display:flex;flex-wrap:wrap;gap:10px;margin-top:22px;align-items:center}
+.tpill{display:flex;align-items:center;gap:9px;background:rgba(16,24,40,.7);border:1px solid var(--line);
+border-radius:99px;padding:9px 16px;font-size:13px;color:var(--tx2);min-height:var(--tap)}
+.tpill b{color:var(--tx);font-weight:700;font-size:15px}
+.tpill.live b{color:var(--up)}
+.tlink{color:var(--acc);font-weight:600;font-size:13.5px;padding:9px 4px;min-height:var(--tap);display:flex;align-items:center}
+
+/* ---------- section headings ---------- */
+.sec{padding:clamp(30px,5vw,46px) 0 0}
+.sechead{display:flex;flex-wrap:wrap;align-items:baseline;gap:10px;margin-bottom:6px}
+.sechead h2{font-size:clamp(19px,2.6vw,25px);font-weight:800;letter-spacing:-.025em}
+.sechead .sub{color:var(--tx3);font-size:13px}
+.secnote{color:var(--tx2);font-size:14px;max-width:70ch;margin:8px 0 18px;line-height:1.6}
+
+/* ---------- featured picks ---------- */
+.picks{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,290px),1fr));gap:14px}
+.pick{position:relative;background:linear-gradient(160deg,#16203a,var(--card));border:1px solid var(--line2);
+border-radius:var(--r);padding:18px;display:block;transition:transform .18s,box-shadow .18s,border-color .18s;overflow:hidden}
+.pick::after{content:"";position:absolute;inset:0 auto 0 0;width:3px;background:var(--grad)}
+.pick:hover{transform:translateY(-3px);border-color:#3c5490;box-shadow:0 14px 36px rgba(0,0,0,.5)}
+.pick .rank{position:absolute;top:14px;right:16px;font-size:11px;font-weight:700;color:var(--tx3);letter-spacing:.08em}
+.pick .sym{font-size:22px;font-weight:800;letter-spacing:-.02em}
+.pick .why{color:var(--tx2);font-size:12.5px;margin-top:3px}
+.lvls{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:14px}
+.lvl{background:#0d1526;border:1px solid var(--line);border-radius:11px;padding:9px 10px;text-align:center}
+.lvl .k{font-size:9.5px;color:var(--tx3);text-transform:uppercase;letter-spacing:.07em;font-weight:700}
+.lvl .v{font-weight:700;font-size:14px;margin-top:2px}
+.emptypick{background:var(--card);border:1px dashed var(--line2);border-radius:var(--r);padding:22px;color:var(--tx2);font-size:14px;line-height:1.6}
+
+/* ---------- controls ---------- */
+.controls{display:flex;flex-wrap:wrap;gap:9px;align-items:center;margin:16px 0 16px}
+.search{flex:1 1 240px;min-width:0;background:var(--card);border:1px solid var(--line);border-radius:12px;
+padding:0 16px;height:var(--tap);outline:none;transition:.2s;font-size:16px}
 .search:focus{border-color:var(--acc)}
-.chip{background:var(--card);border:1px solid var(--line);color:var(--tx2);border-radius:99px;padding:8px 16px;font-size:13px;font-weight:600;cursor:pointer;transition:.15s}
-.chip:hover{color:var(--tx);border-color:#2c3d63}
+.chiprow{display:flex;gap:8px;overflow-x:auto;scrollbar-width:none;-webkit-overflow-scrolling:touch;padding-bottom:2px;margin:0 calc(var(--pad)*-1);padding-inline:var(--pad)}
+.chiprow::-webkit-scrollbar{display:none}
+.chip{background:var(--card);border:1px solid var(--line);color:var(--tx2);border-radius:99px;
+padding:0 16px;height:var(--tap);display:inline-flex;align-items:center;font-size:13.5px;font-weight:600;
+cursor:pointer;transition:.15s;white-space:nowrap;flex-shrink:0}
+.chip:hover{color:var(--tx);border-color:var(--line2)}
 .chip.on{background:var(--grad);color:#fff;border-color:transparent}
-select{background:var(--card);border:1px solid var(--line);color:var(--tx);border-radius:12px;padding:10px 14px;font:inherit;outline:none}
-/* grid */
-.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(272px,1fr));gap:14px;padding-bottom:60px}
-.card{background:linear-gradient(160deg,var(--card2),var(--card));border:1px solid var(--line);border-radius:16px;padding:18px;cursor:pointer;transition:transform .18s,border-color .18s,box-shadow .18s;position:relative;overflow:hidden}
-.card:hover{transform:translateY(-3px);border-color:#33477a;box-shadow:0 12px 34px rgba(0,0,0,.45)}
-.card .top{display:flex;justify-content:space-between;align-items:flex-start}
-.sym{font-weight:800;font-size:19px;letter-spacing:-.01em}
+select.sortsel{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:0 12px;height:var(--tap);outline:none;font-size:14px}
+.count{color:var(--tx3);font-size:13px;margin-bottom:12px}
+
+/* ---------- stock grid ---------- */
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,268px),1fr));gap:13px;padding-bottom:16px}
+.card{background:linear-gradient(160deg,var(--card2),var(--card));border:1px solid var(--line);border-radius:var(--r);
+padding:17px;transition:transform .18s,border-color .18s,box-shadow .18s;position:relative;overflow:hidden;display:block}
+.card:hover{transform:translateY(-3px);border-color:#33477a;box-shadow:0 12px 32px rgba(0,0,0,.45)}
+.card .top{display:flex;justify-content:space-between;align-items:flex-start;gap:8px}
+.sym{font-weight:800;font-size:18.5px;letter-spacing:-.01em}
 .struct{font-size:11px;color:var(--tx3);margin-top:2px}
-.verdict{font-size:11px;font-weight:700;padding:5px 11px;border-radius:99px;letter-spacing:.03em}
-.v-sb{background:rgba(16,217,142,.14);color:var(--up)} .v-b{background:rgba(16,217,142,.09);color:#6fe3b4}
-.v-h{background:rgba(245,185,80,.12);color:var(--hold)} .v-s,.v-ss{background:rgba(255,84,112,.13);color:var(--dn)}
-.price{font-size:23px;font-weight:700;margin:12px 0 2px}
-.price span{font-size:11px;color:var(--tx3);font-weight:500;white-space:nowrap}
+.verdict{font-size:10.5px;font-weight:700;padding:5px 10px;border-radius:99px;letter-spacing:.03em;white-space:nowrap}
+.v-sb{background:rgba(16,217,142,.16);color:var(--up)}.v-b{background:rgba(16,217,142,.09);color:#6fe3b4}
+.v-h{background:rgba(245,185,80,.12);color:var(--hold)}.v-s,.v-ss{background:rgba(255,84,112,.13);color:var(--dn)}
+.price{font-size:22px;font-weight:700;margin:12px 0 2px}
 .meter{height:5px;background:#1a2540;border-radius:99px;margin:12px 0 6px;overflow:hidden}
 .meter i{display:block;height:100%;border-radius:99px}
-.row{display:flex;justify-content:space-between;font-size:12px;color:var(--tx2);margin-top:8px}
+.row{display:flex;justify-content:space-between;gap:8px;font-size:12px;color:var(--tx2);margin-top:8px}
 .row b{color:var(--tx);font-weight:600}
-.tag{position:absolute;top:0;right:0;font-size:10px;font-weight:700;background:rgba(16,217,142,.15);color:var(--up);padding:4px 10px;border-bottom-left-radius:10px}
-footer{border-top:1px solid var(--line);padding:26px 0 40px;color:var(--tx3);font-size:12.5px}
-.warn{background:rgba(245,185,80,.07);border:1px solid rgba(245,185,80,.25);border-radius:12px;padding:12px 16px;font-size:13px;color:#d8c08a;margin-bottom:22px}
-@media(max-width:700px){.tickers{display:none}}
+.tag{position:absolute;top:0;right:0;font-size:9.5px;font-weight:700;background:rgba(16,217,142,.16);color:var(--up);padding:4px 9px;border-bottom-left-radius:10px;letter-spacing:.03em}
+.tag.alt{background:rgba(139,152,184,.13);color:var(--tx2)}
+.more{display:flex;justify-content:center;padding:4px 0 8px}
+.morebtn{background:var(--card);border:1px solid var(--line2);border-radius:99px;padding:0 26px;height:var(--tap);
+font-weight:600;font-size:14px;cursor:pointer;color:var(--tx2)}
+.morebtn:hover{color:var(--tx);border-color:var(--acc)}
+
+/* ---------- tooltip (hover + tap) ---------- */
+.tip{border-bottom:1px dotted var(--tx3);cursor:help;position:relative}
+.tip::after{content:attr(data-tip);position:absolute;left:50%;bottom:calc(100% + 9px);transform:translateX(-50%) translateY(4px);
+background:#0b1424;color:var(--tx);border:1px solid var(--line2);border-radius:10px;padding:9px 12px;
+font-size:12.5px;font-weight:400;line-height:1.5;letter-spacing:0;text-transform:none;width:max-content;max-width:min(76vw,270px);
+opacity:0;visibility:hidden;transition:.16s;z-index:70;box-shadow:0 10px 30px rgba(0,0,0,.6);pointer-events:none;white-space:normal}
+.tip:hover::after,.tip:focus::after,.tip.open::after{opacity:1;visibility:visible;transform:translateX(-50%) translateY(0)}
+
+/* ---------- stats tiles ---------- */
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,168px),1fr));gap:11px}
+.stat{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px 16px}
+.stat .k{font-size:11px;color:var(--tx3);text-transform:uppercase;letter-spacing:.07em;font-weight:700}
+.stat .v{font-size:clamp(19px,2.4vw,22px);font-weight:700;margin-top:3px}
+.stat .s{font-size:11.5px;color:var(--tx3);margin-top:3px;line-height:1.45}
+
+/* ---------- performance card ---------- */
+.perf{background:linear-gradient(160deg,var(--card2),var(--card));border:1px solid var(--line);border-radius:var(--r);padding:clamp(16px,3vw,22px);margin:0 0 16px}
+.perfhead{display:flex;flex-wrap:wrap;align-items:center;gap:10px}
+.perfhead h3{font-size:12.5px;text-transform:uppercase;letter-spacing:.09em;color:var(--tx3);font-weight:700}
+.pfheadline{font-size:clamp(15px,2vw,17px);margin:12px 0 4px;line-height:1.5}
+.pflegend{display:flex;flex-wrap:wrap;gap:14px;font-size:12px;color:var(--tx2);margin-bottom:8px}
+.chartbox{position:relative}
+#pfch{width:100%;height:clamp(200px,34vw,260px);display:block;touch-action:pan-y}
+#pftip{display:none;position:absolute;pointer-events:none;background:#0b1424;border:1px solid var(--line2);
+border-radius:10px;padding:8px 11px;font-size:12px;white-space:nowrap;z-index:5;box-shadow:0 8px 24px rgba(0,0,0,.5)}
+.fineprint{color:var(--tx3);font-size:12px;margin-top:10px;line-height:1.6}
+
+/* ---------- ledger: table on desktop, cards on mobile ---------- */
+.ledwrap{background:var(--card);border:1px solid var(--line);border-radius:var(--r);padding:2px 18px 12px;overflow-x:auto}
+table.led{width:100%;border-collapse:collapse;font-size:13px;min-width:720px}
+table.led th{color:var(--tx3);font-size:10.5px;text-transform:uppercase;letter-spacing:.07em;padding:12px 8px;border-bottom:1px solid var(--line);text-align:left;white-space:nowrap}
+table.led td{padding:10px 8px;border-bottom:1px solid var(--line);white-space:nowrap}
+table.led th.r,table.led td.r{text-align:right}
+.ledcards{display:none;flex-direction:column;gap:10px}
+.ledcard{background:var(--card);border:1px solid var(--line);border-radius:13px;padding:14px}
+.ledcard .lh{display:flex;justify-content:space-between;align-items:center;gap:8px}
+.ledcard .ls{font-weight:800;font-size:16px}
+.ledcard .lg{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-top:11px}
+.ledcard .lg div{font-size:11px;color:var(--tx3)}
+.ledcard .lg b{display:block;color:var(--tx2);font-weight:600;font-size:12.5px;margin-top:2px}
+.simb{font-size:9px;color:var(--tx3);border:1px solid var(--line2);border-radius:99px;padding:1px 6px;vertical-align:middle}
+@media(max-width:760px){.ledwrap{display:none}.ledcards{display:flex}}
+
+.warn{background:rgba(245,185,80,.07);border:1px solid rgba(245,185,80,.25);border-radius:13px;padding:13px 16px;font-size:13px;color:#d8c08a;line-height:1.55}
+footer{border-top:1px solid var(--line);margin-top:40px;padding:26px 0 calc(40px + env(safe-area-inset-bottom));color:var(--tx3);font-size:12.5px;line-height:1.7}
+.skel{background:linear-gradient(90deg,#131c2e,#1a2540,#131c2e);background-size:200% 100%;animation:sh 1.4s infinite;border-radius:var(--r);height:150px}
+@keyframes sh{0%{background-position:200% 0}100%{background-position:-200% 0}}
+@media(prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important;scroll-behavior:auto}}
 </style></head><body>
+
 <header><div class="wrap nav">
-  <div class="logo"><div class="dot">📈</div>PSX <span style="background:var(--grad);-webkit-background-clip:text;background-clip:text;color:transparent">Edge</span></div>
+  <a class="logo" href="index.html"><div class="dot">📈</div>PSX <span class="g">Edge</span></a>
   <span class="badge" id="asof">—</span><div class="sp"></div>
   <div class="tickers" id="tickers"></div>
 </div></header>
+<div class="tkbar"><div class="in" id="tickers2"></div></div>
 
 <section class="hero"><div class="wrap">
-  <h1>KSE-100 trading levels,<br>computed fresh <span class="g">every market close.</span></h1>
-  <p>Pivot supports, Fibonacci zones, stop-losses and take-profit targets for all KSE-100 stocks — pure quantitative analysis, updated daily at 5pm PKT. No opinions. Just math.</p>
-  <div class="stats" id="stats"></div>
+  <h1>KSE-100 trading levels, computed fresh <span class="g">every market close.</span></h1>
+  <p class="lede">Entry, stop-loss and take-profit levels for all 94 KSE-100 stocks — pure quantitative analysis, updated daily at 5pm PKT. No opinions, no tips. Just math you can verify.</p>
+  <div class="trust" id="trust"></div>
 </div></section>
 
 <main class="wrap">
-  <div class="warn">⚠️ Automated technical analysis for information only — <b>not investment advice</b>. Probabilities, not guarantees. Execute all orders manually in your broker terminal.</div>
-  <div class="controls">
-    <input class="search" id="q" placeholder="Search symbol… e.g. OGDC, HBL, LUCK">
-    <button class="chip on" data-f="all">All</button>
-    <button class="chip" data-f="Strong Buy">Strong Buy</button>
-    <button class="chip" data-f="Buy">Buy</button>
-    <button class="chip" data-f="Hold">Hold</button>
-    <button class="chip" data-f="sell">Sell</button>
-    <button class="chip" data-f="valid">✓ Valid setups</button>
-    <select id="sort"><option value="score">Sort: Score</option><option value="confidence">Confidence</option><option value="symbol">Symbol A–Z</option><option value="close">Price</option></select>
-  </div>
-  <div class="grid" id="grid"></div>
+  <div id="regimewarn"></div>
 
-  <section id="track" style="display:none;padding-bottom:60px">
-    <h2 style="font-size:24px;font-weight:800;letter-spacing:-.02em">Track record — every signal, audited</h2>
-    <p style="color:var(--tx2);font-size:14px;margin:8px 0 18px;max-width:720px">
-      Every published R:R-valid setup is frozen at publish time and scored against what the market
-      actually did: <b>TP1/TP2</b> = target touched after a fill, <b>SL</b> = stop touched
-      (same-bar stop counts as a loss), <b>Expired</b> = closed at market after 5 sessions,
-      <b>Not&nbsp;filled</b> = price never pulled back to the limit. No cherry-picking — misses stay on the board.
-      Two cuts are shown: <b>Buy signals</b> (setups on stocks the site rated Buy / Strong Buy — the trades
-      we'd actually recommend) and <b>All valid setups</b> (every setup that passed the 1:2 risk-reward
-      rule, even on Hold/Sell-rated stocks, shown for full transparency).</p>
-    <div class="stats" id="trstats" style="margin:0 0 18px"></div>
-
-    <div id="perf" style="display:none;background:linear-gradient(160deg,#141d30,var(--card));border:1px solid var(--line);border-radius:16px;padding:20px;margin:0 0 18px">
-      <div style="display:flex;flex-wrap:wrap;align-items:center;gap:10px">
-        <h3 style="font-size:13px;text-transform:uppercase;letter-spacing:.09em;color:var(--tx3);font-weight:700;margin:0">If you followed the Buy signals — Rs 100,000 simulated</h3>
-        <div style="flex:1"></div>
-        <div id="pfwins" role="group" aria-label="Time window"></div>
-      </div>
-      <p id="pfheadline" style="font-size:16px;margin:12px 0 4px"></p>
-      <div style="display:flex;gap:16px;font-size:12px;color:var(--tx2);margin:0 0 8px" id="pflegend"></div>
-      <div style="position:relative"><canvas id="pfch" height="260" style="width:100%;height:260px"></canvas>
-        <div id="pftip" style="display:none;position:absolute;pointer-events:none;background:#0d1526;border:1px solid var(--line);border-radius:9px;padding:7px 10px;font-size:12px;white-space:nowrap;z-index:5"></div></div>
-      <p id="pfrules" style="color:var(--tx3);font-size:12px;margin-top:10px"></p>
-    </div>
-
-    <div style="background:var(--card);border:1px solid var(--line);border-radius:16px;padding:6px 18px 14px;overflow-x:auto">
-      <table style="width:100%;border-collapse:collapse;font-size:13px;min-width:760px">
-        <thead><tr id="trhead"></tr></thead><tbody id="trbody"></tbody>
-      </table>
-    </div>
-    <p id="trnote" style="color:var(--tx3);font-size:12px;margin-top:10px"></p>
+  <section class="sec" id="best">
+    <div class="sechead"><h2>Today's best setups</h2><span class="sub" id="bestsub"></span></div>
+    <p class="secnote">Only setups where the reward is at least twice the risk make this list. Most days that's a handful of stocks out of 94 — if none qualify, we say so rather than inventing a trade.</p>
+    <div class="picks" id="picks"><div class="skel"></div><div class="skel"></div><div class="skel"></div></div>
   </section>
+
+  <section class="sec">
+    <div class="sechead"><h2>All KSE-100 stocks</h2><span class="sub" id="cnt"></span></div>
+    <div class="controls">
+      <label class="sr" for="q">Search symbol</label>
+      <input class="search" id="q" placeholder="Search symbol or sector… OGDC, bank, cement" autocomplete="off">
+      <select class="sortsel" id="sort" aria-label="Sort by">
+        <option value="score">Sort: Score</option><option value="confidence">Confidence</option>
+        <option value="symbol">Symbol A–Z</option><option value="close">Price</option></select>
+    </div>
+    <div class="chiprow" role="group" aria-label="Filter">
+      <button class="chip on" data-f="all">All</button>
+      <button class="chip" data-f="valid">✓ Buy setups</button>
+      <button class="chip" data-f="Strong Buy">Strong Buy</button>
+      <button class="chip" data-f="buy">Buy (incl. Strong)</button>
+      <button class="chip" data-f="Hold">Hold</button>
+      <button class="chip" data-f="sell">Sell</button>
+    </div>
+    <div class="count" id="cnt2"></div>
+    <div class="grid" id="grid"></div>
+    <div class="more" id="more"></div>
+  </section>
+
+  <section class="sec" id="track" style="display:none">
+    <div class="sechead"><h2>Track record — every signal, audited</h2></div>
+    <p class="secnote">Every published setup is frozen at publish time and scored against what the market actually did:
+      <b class="tip" data-tip="The target price was reached after the buy order filled.">TP1 / TP2 hit</b>,
+      <b class="tip" data-tip="Price fell to the stop-loss. If the stop was touched in the same session as entry, we count it as a loss — the conservative assumption.">Stopped</b>,
+      <b class="tip" data-tip="Neither target nor stop was reached within 5 trading sessions; closed at the market price.">Expired</b>, or
+      <b class="tip" data-tip="Price never pulled back to our buy limit, so no trade would have happened.">Not filled</b>.
+      No cherry-picking — the misses stay on the board.</p>
+    <div class="stats" id="trstats" style="margin-bottom:16px"></div>
+
+    <div class="perf" id="perf" style="display:none">
+      <div class="perfhead">
+        <h3>If you followed the Buy signals — Rs 100,000 simulated</h3>
+        <div class="sp" style="flex:1"></div>
+        <div class="chiprow" id="pfwins" style="margin:0;padding:0;overflow:visible"></div>
+      </div>
+      <p class="pfheadline" id="pfheadline"></p>
+      <div class="pflegend" id="pflegend"></div>
+      <div class="chartbox"><canvas id="pfch"></canvas><div id="pftip"></div></div>
+      <p class="fineprint" id="pfrules"></p>
+    </div>
+
+    <div class="sechead" style="margin:22px 0 10px"><h2 style="font-size:17px">Trade ledger</h2>
+      <div class="chiprow" id="ledwins" style="margin:0;padding:0;overflow:visible">
+        <button class="chip on" data-l="buy" style="height:36px;padding:0 14px;font-size:12.5px">Buy-rated only</button>
+        <button class="chip" data-l="all" style="height:36px;padding:0 14px;font-size:12.5px">All valid setups</button></div></div>
+    <div class="ledwrap"><table class="led"><thead><tr id="trhead"></tr></thead><tbody id="trbody"></tbody></table></div>
+    <div class="ledcards" id="ledcards"></div>
+    <p class="fineprint" id="trnote"></p>
+  </section>
+
+  <div class="warn" style="margin-top:34px">⚠️ Automated technical analysis for information only — <b>not investment advice</b>. Signals are probabilities, never guarantees. Place and manage every order yourself in your broker terminal.</div>
 </main>
 
-<footer><div class="wrap">PSX Edge · Data: Pakistan Stock Exchange EOD · Analysis is fully algorithmic (pivot points, Fibonacci, momentum, market structure). Signals are probabilistic and past performance does not guarantee future results. Not registered investment advice under SECP regulations.<span id="excl"></span></div></footer>
+<footer><div class="wrap">PSX Edge · Data: Pakistan Stock Exchange EOD · Analysis is fully algorithmic (pivot points, Fibonacci retracements, momentum, market structure) with zero manual input. Past performance does not guarantee future results. Not registered investment advice under SECP regulations.<span id="excl"></span></div></footer>
 
 <script>
+const $=s=>document.querySelector(s),$$=s=>[...document.querySelectorAll(s)];
+const fmt=n=>Number(n).toLocaleString("en-PK",{maximumFractionDigits:2});
 const V={"Strong Buy":"v-sb","Buy":"v-b","Hold":"v-h","Sell":"v-s","Strong Sell":"v-ss"};
 const mc=s=>s>=6.2?"var(--up)":s>=4.5?"var(--hold)":"var(--dn)";
-let DATA=[],f="all";
-const fmt=n=>Number(n).toLocaleString("en-PK",{maximumFractionDigits:2});
+let DATA=[],f="all",shown=24;
+
+/* tap-to-open tooltips on touch devices */
+document.addEventListener("click",e=>{
+  const t=e.target.closest(".tip");
+  $$(".tip.open").forEach(x=>x!==t&&x.classList.remove("open"));
+  if(t)t.classList.toggle("open");
+});
+
 fetch("output/summary.json").then(r=>r.json()).then(d=>{
-  DATA=d.stocks; document.getElementById("asof").textContent="Updated "+d.generated;
+  DATA=d.stocks;
+  const dataDate=(DATA[0]||{}).as_of;
+  $("#asof").textContent=dataDate&&dataDate!==d.generated
+    ? `Data through ${dataDate} · published ${d.generated}` : `Data through ${dataDate||d.generated}`;
+  $("#asof").title="Market data is end-of-day. The publish date is when our engine last ran.";
   const m=d.macro||{};
-  document.getElementById("tickers").innerHTML=
-    (m.kse100?`<span>KSE-100 <b>${fmt(m.kse100)}</b></span>`:"")+
+  const tk=(m.kse100?`<span>KSE-100 <b>${fmt(m.kse100)}</b></span>`:"")+
     (m.usdpkr?`<span>USD/PKR <b>${fmt(m.usdpkr)}</b></span>`:"")+
     (m.brent?`<span>Brent <b>$${fmt(m.brent)}</b></span>`:"")+
     (d.regime&&d.regime!=="Unknown"?`<span style="color:${d.regime==="Risk-On"?"var(--up)":"var(--dn)"};font-weight:700">● ${d.regime}</span>`:"");
-  if(d.regime==="Risk-Off")document.querySelector(".controls").insertAdjacentHTML("beforebegin",
-    '<div class="warn">🔻 <b>Risk-Off regime:</b> KSE-100 is trading below its 50-day EMA — all composite scores are being reduced by the market-regime filter. Expect fewer and weaker buy signals until the index reclaims trend.</div>');
-  const sb=DATA.filter(x=>x.verdict==="Strong Buy").length, vs=DATA.filter(x=>x.setup_valid).length;
-  document.getElementById("stats").innerHTML=[["Stocks analyzed",DATA.length],["Strong Buy signals",sb],["Valid R:R setups",vs],["Bullish structure",DATA.filter(x=>x.structure==="Bullish").length]]
-    .map(([k,v])=>`<div class="stat"><div class="k">${k}</div><div class="v">${v}</div></div>`).join("");
-  const ex=d.excluded_stale||{}; if(Object.keys(ex).length)
-    document.getElementById("excl").textContent=" · Excluded (no fresh data): "+Object.keys(ex).join(", ");
-  render();
+  $("#tickers").innerHTML=tk;$("#tickers2").innerHTML=tk;
+  if(d.regime==="Risk-Off")$("#regimewarn").innerHTML=
+    '<div class="warn" style="margin-top:18px">🔻 <b>Risk-Off regime:</b> the KSE-100 is below its 50-day average, so every score is being reduced by the market-regime filter. Expect fewer and weaker buy signals until the index reclaims its trend.</div>';
+  const ex=d.excluded_stale||{};
+  if(Object.keys(ex).length)$("#excl").textContent=" · Excluded (no fresh data): "+Object.keys(ex).join(", ");
+  renderPicks();render();
 });
+
+/* ---------- today's best setups ---------- */
+function renderPicks(){
+  /* a featured pick must BOTH be rated Buy/Strong Buy AND pass the R:R rule —
+     a Sell-rated stock whose pivot maths happens to pass is not a buy idea */
+  const buys=DATA.filter(x=>x.setup_valid&&/Buy/.test(x.verdict));
+  const top=buys.slice().sort((a,b)=>b.score-a.score).slice(0,3);
+  const nValid=DATA.filter(x=>x.setup_valid).length;
+  $("#bestsub").textContent=top.length?`${buys.length} Buy-rated setup${buys.length>1?"s":""} passed the 1:2 risk-reward rule`:"";
+  if(!top.length){
+    $("#picks").innerHTML=`<div class="emptypick" style="grid-column:1/-1"><b>No Buy-rated setup clears the risk-reward rule today.</b><br>
+      That is a normal outcome, not an error — on most days the pivot levels don't offer twice as much reward as risk on a stock we also rate a buy.
+      ${nValid?`(${nValid} setup${nValid>1?"s":""} passed the risk-reward maths but sit on stocks rated Hold or Sell, so we don't feature them.)`:""}
+      Browse all stocks below for levels and context, or check back after tomorrow's close.</div>`;return;}
+  $("#picks").innerHTML=top.map((x,i)=>`
+    <a class="pick" href="stock.html?s=${x.symbol}">
+      <div class="rank">#${i+1}</div>
+      <div class="sym">${x.symbol}</div>
+      <div class="why">${x.verdict} · score ${x.score}/10 · ${x.structure} structure${x.est_days_tp1?` · ~${x.est_days_tp1}d to TP1`:""}</div>
+      <div class="lvls">
+        <div class="lvl"><div class="k">Buy at</div><div class="v mono">${fmt(x.primary_buy)}</div></div>
+        <div class="lvl"><div class="k">Stop</div><div class="v mono" style="color:var(--dn)">${fmt(x.stop_loss)}</div></div>
+        <div class="lvl"><div class="k">Target</div><div class="v mono" style="color:var(--up)">${fmt(x.tp1)}</div></div>
+      </div>
+    </a>`).join("");
+}
+
+/* ---------- all stocks ---------- */
+$$(".chiprow .chip").forEach(b=>{if(!b.dataset.f)return;b.onclick=()=>{
+  $$(".chiprow .chip").forEach(x=>x.dataset.f&&x.classList.toggle("on",x===b));f=b.dataset.f;shown=24;render();};});
+$("#q").addEventListener("input",()=>{shown=24;render()});
+$("#sort").addEventListener("change",render);
 function render(){
-  const q=document.getElementById("q").value.toUpperCase(), s=document.getElementById("sort").value;
-  let rows=DATA.filter(x=>!q||x.symbol.includes(q));
-  if(f==="valid")rows=rows.filter(x=>x.setup_valid);
+  const q=$("#q").value.toUpperCase(),s=$("#sort").value;
+  let rows=DATA.filter(x=>!q||x.symbol.includes(q)||(x.sector||"").toUpperCase().includes(q));
+  if(f==="valid")rows=rows.filter(x=>x.setup_valid&&/Buy/.test(x.verdict));
   else if(f==="sell")rows=rows.filter(x=>x.verdict.includes("Sell"));
+  else if(f==="buy")rows=rows.filter(x=>x.verdict.includes("Buy"));      /* incl. Strong Buy */
   else if(f!=="all")rows=rows.filter(x=>x.verdict===f);
   rows.sort((a,b)=>s==="symbol"?a.symbol.localeCompare(b.symbol):b[s]-a[s]);
-  document.getElementById("grid").innerHTML=rows.map(x=>`
+  $("#cnt").textContent=DATA.length+" analysed daily";
+  $("#cnt2").textContent=rows.length?`Showing ${Math.min(shown,rows.length)} of ${rows.length}`:"";
+  $("#grid").innerHTML=rows.slice(0,shown).map(x=>`
   <a class="card" href="stock.html?s=${x.symbol}">
-    ${x.setup_valid?'<div class="tag">R:R ✓</div>':""}
+    ${x.setup_valid?(/Buy/.test(x.verdict)
+      ?'<div class="tag">BUY SETUP ✓</div>'
+      :'<div class="tag alt" title="Passed the 1:2 risk-reward maths, but we do not rate this stock a buy — so it is not featured as a setup.">R:R only</div>'):""}
     <div class="top"><div><div class="sym">${x.symbol}</div><div class="struct">${x.structure} structure</div></div>
     <span class="verdict ${V[x.verdict]||"v-h"}">${x.verdict.toUpperCase()}</span></div>
     <div class="price mono">Rs ${fmt(x.close)}</div>
     <div class="meter"><i style="width:${x.score*10}%;background:${mc(x.score)}"></i></div>
     <div class="row"><span>Score <b>${x.score}</b>/10</span><span>Confidence <b>${x.confidence}%</b></span></div>
     <div class="row"><span>Buy <b class="mono">${fmt(x.primary_buy)}</b></span><span>SL <b class="mono">${fmt(x.stop_loss)}</b></span><span>TP1 <b class="mono">${fmt(x.tp1)}</b></span></div>
-  </a>`).join("")||'<p style="color:var(--tx3)">No matches.</p>';
+  </a>`).join("")||`<p style="color:var(--tx3);grid-column:1/-1;padding:22px 0">No stocks match that filter.</p>`;
+  $("#more").innerHTML=rows.length>shown?`<button class="morebtn" id="mb">Show ${Math.min(24,rows.length-shown)} more</button>`:"";
+  const mb=$("#mb");if(mb)mb.onclick=()=>{shown+=24;render()};
 }
-/* ---------- transparent track record (output/track_record.json) ---------- */
+
+/* ---------- track record ---------- */
 const OC={TP2:["TP2 hit","var(--up)"],TP1:["TP1 hit","var(--up)"],SL:["Stopped","var(--dn)"],
-          EXPIRED:["Expired","var(--hold)"],NOT_FILLED:["Not filled","var(--tx3)"],VOID_CA:["Void (corp. action)","var(--tx3)"]};
+  EXPIRED:["Expired","var(--hold)"],NOT_FILLED:["Not filled","var(--tx3)"],VOID_CA:["Void","var(--tx3)"]};
 fetch("output/track_record.json").then(r=>{if(!r.ok)throw 0;return r.json()}).then(t=>{
   const s30=t.last_30d||{},all=t.all_time||{};
-  const b30=t.last_30d_buy||s30,ball=t.all_time_buy||all;   // fall back pre-upgrade
+  const b30=t.last_30d_buy||s30,ball=t.all_time_buy||all;
   if(!all.signals)return;
-  document.getElementById("track").style.display="block";
+  $("#track").style.display="block";
   const pc=x=>x!=null?x+"%":"—";
-  const tile=(k,v,sub)=>`<div class="stat"><div class="k">${k}</div><div class="v">${v??"—"}</div>${sub?`<div class="k" style="margin-top:2px;text-transform:none;letter-spacing:0">${sub}</div>`:""}</div>`;
-  document.getElementById("trstats").innerHTML=
-    tile("Buy signals · 30d",pc(b30.win_rate_pct),`${b30.wins||0}W / ${b30.losses||0}L of ${b30.trades||0} trades · avg ${pc(b30.avg_return_pct)}`)+
-    tile("Buy signals · all time",pc(ball.win_rate_pct),`${ball.trades||0} trades from ${ball.signals||0} signals · avg ${pc(ball.avg_return_pct)}`)+
-    tile("All valid setups · 30d",pc(s30.win_rate_pct),`${s30.wins||0}W / ${s30.losses||0}L of ${s30.trades||0} trades · incl. Hold/Sell verdicts`)+
-    tile("All valid setups · all time",pc(all.win_rate_pct),`${all.trades} trades from ${all.signals} signals · avg ${pc(all.avg_return_pct)}`)+
+  /* trust strip in hero */
+  const liveN=(t.live_only||{}).trades||0, simMost=liveN<Math.max(5,(ball.trades||0)*0.5);
+  const simTag=simMost?` <span class="simb" title="These figures come mostly from a simulated walk-forward replay of the same engine. Live published signals began 2026-08-18 and are replacing them as they resolve.">SIMULATED</span>`:"";
+  $("#trust").innerHTML=
+    (b30.win_rate_pct!=null?`<div class="tpill live"><span>Buy-signal win rate, 30d${simTag}</span><b>${b30.win_rate_pct}%</b></div>`:"")+
+    (ball.trades?`<div class="tpill"><span>Buy trades audited${simTag}</span><b>${ball.trades}</b></div>`:"")+
+    (t.portfolio?`<div class="tpill"><span>Rs 100k, following Buy signals${simTag}</span><b>Rs ${fmt(Math.round(t.portfolio.series.at(-1)[1]))}</b></div>`:"")+
+    `<a class="tlink" href="#track">See every trade, wins and losses →</a>`+
+    (simMost?`<p style="flex-basis:100%;color:var(--tx3);font-size:12.5px;margin-top:2px;line-height:1.55">
+      These figures are from a <b>simulated replay</b> of the engine over past data — not signals published in advance.
+      Live tracking started 18 Aug 2026; the live record replaces this as trades resolve.</p>`:"");
+  const tile=(k,v,sub)=>`<div class="stat"><div class="k">${k}</div><div class="v">${v??"—"}</div>${sub?`<div class="s">${sub}</div>`:""}</div>`;
+  $("#trstats").innerHTML=
+    tile(`<span class="tip" data-tip="Only setups on stocks we rated Buy or Strong Buy — the trades we would actually recommend.">Buy signals · 30d</span>`,pc(b30.win_rate_pct),`${b30.wins||0}W / ${b30.losses||0}L of ${b30.trades||0} trades · avg ${pc(b30.avg_return_pct)}`)+
+    tile("Buy signals · all time",pc(ball.win_rate_pct),`${ball.trades||0} closed trades from ${ball.signals||0} Buy-rated setups · avg ${pc(ball.avg_return_pct)}`)+
+    tile(`<span class="tip" data-tip="Every setup that passed the 1:2 risk-reward rule, including ones on stocks we rated Hold or Sell. Shown for full transparency.">All valid setups · 30d</span>`,pc(s30.win_rate_pct),`${s30.wins||0}W / ${s30.losses||0}L of ${s30.trades||0} trades`)+
+    tile("All valid setups · all time",pc(all.win_rate_pct),`${all.trades} closed trades from ${all.signals} setups, incl. Hold/Sell · avg ${pc(all.avg_return_pct)}`)+
     tile("Avg days to win",ball.avg_days_to_win??all.avg_days_to_win??"—","sessions, fill → target")+
     tile("Open signals",t.open_signals??0,"awaiting outcome");
-  document.getElementById("trhead").innerHTML=
-    ["Symbol","Signal date","Verdict","Entry","SL","TP1","TP2","Outcome","Return","Days"]
-    .map((h,i)=>`<th style="text-align:${i>2?"right":"left"};color:var(--tx3);font-size:11px;text-transform:uppercase;letter-spacing:.07em;padding:10px 8px;border-bottom:1px solid var(--line)">${h}</th>`).join("");
-  document.getElementById("trbody").innerHTML=(t.ledger||[]).slice(0,20).map(r=>{
-    const[label,col]=OC[r.outcome]||[r.outcome,"var(--tx2)"];
-    const ret=r.return_pct!=null?(r.return_pct>0?"+":"")+r.return_pct+"%":"—";
-    return `<tr>
-      <td style="padding:9px 8px;border-bottom:1px solid var(--line)"><a href="stock.html?s=${r.symbol}" style="font-weight:700">${r.symbol}</a>${r.source==="backfill"?' <span title="Simulated walk-forward replay, not a signal published in advance" style="font-size:9px;color:var(--tx3);border:1px solid var(--line);border-radius:99px;padding:1px 6px">SIM</span>':""}</td>
-      <td style="padding:9px 8px;border-bottom:1px solid var(--line);color:var(--tx2)" class="mono">${r.signal_date}</td>
-      <td style="padding:9px 8px;border-bottom:1px solid var(--line);color:var(--tx2)">${r.verdict}</td>
-      <td style="padding:9px 8px;border-bottom:1px solid var(--line);text-align:right" class="mono">${fmt(r.entry)}</td>
-      <td style="padding:9px 8px;border-bottom:1px solid var(--line);text-align:right;color:var(--tx3)" class="mono">${fmt(r.stop_loss)}</td>
-      <td style="padding:9px 8px;border-bottom:1px solid var(--line);text-align:right;color:var(--tx3)" class="mono">${fmt(r.tp1)}</td>
-      <td style="padding:9px 8px;border-bottom:1px solid var(--line);text-align:right;color:var(--tx3)" class="mono">${fmt(r.tp2)}</td>
-      <td style="padding:9px 8px;border-bottom:1px solid var(--line);font-weight:700;color:${col}">${label}</td>
-      <td style="padding:9px 8px;border-bottom:1px solid var(--line);text-align:right;font-weight:600;color:${r.return_pct>0?"var(--up)":r.return_pct<0?"var(--dn)":"var(--tx3)"}" class="mono">${ret}</td>
-      <td style="padding:9px 8px;border-bottom:1px solid var(--line);text-align:right;color:var(--tx2)" class="mono">${r.days??"—"}</td></tr>`}).join("");
-  const wl=(t.weights_log||[]);
-  document.getElementById("trnote").textContent=
-    `Method: ${t.method?.fill_rule}; expiry after ${t.method?.expiry_days} sessions; ${t.method?.conservative}. `+
-    ((t.ledger||[]).some(r=>r.source==="backfill")?`Rows marked SIM are a simulated historical replay of the same engine, shown for context. `:"")+
-    (wl.length?`Latest calibration: ${wl[wl.length-1].reason} → weights auto-adjusted.`:"Signal weights: no calibration adjustment yet.");
+  const H=["Symbol","Signal date","Verdict","Entry","SL","TP1","TP2","Outcome","Return","Days"];
+  $("#trhead").innerHTML=H.map((h,i)=>`<th class="${i>2&&i<7||i>7?"r":""}">${h}</th>`).join("");
+  window.__led=t.ledger||[];window.__ledCut="buy";drawLedger();
+  document.querySelectorAll("#ledwins .chip").forEach(b=>b.onclick=()=>{
+    window.__ledCut=b.dataset.l;
+    document.querySelectorAll("#ledwins .chip").forEach(x=>x.classList.toggle("on",x===b));drawLedger()});
+  const wl=t.weights_log||[];
+  $("#trnote").textContent=`Method: ${t.method?.fill_rule}; expiry after ${t.method?.expiry_days} sessions; ${t.method?.conservative}. `+
+    ((t.ledger||[]).some(r=>r.source==="backfill")?"Rows marked SIM are a simulated historical replay of the same engine, shown for context. ":"")+
+    (wl.length?`Latest calibration: ${wl.at(-1).reason} → weights auto-adjusted.`:"Signal weights: no calibration adjustment yet.");
   initPerf(t.portfolio);
 }).catch(()=>{});
 
-/* ---------- performance: "growth of Rs 100k" equity curve ---------- */
-const PF={port:"#5988f2",bench:"#bd6e8b"};      // pair validated for CVD on dark surface
+function drawLedger(){
+  const cut=window.__ledCut||"buy";
+  const L=(window.__led||[]).filter(r=>cut==="all"||/Buy/.test(r.verdict)).slice(0,20);
+  if(!L.length){$("#trbody").innerHTML=`<tr><td colspan="10" style="color:var(--tx3);padding:18px 8px">No closed Buy-rated trades yet — they appear here as signals resolve.</td></tr>`;
+    $("#ledcards").innerHTML=`<p style="color:var(--tx3);font-size:13px">No closed Buy-rated trades yet.</p>`;return}
+  $("#trbody").innerHTML=L.map(r=>{
+    const[lb,col]=OC[r.outcome]||[r.outcome,"var(--tx2)"];
+    const ret=r.return_pct!=null?(r.return_pct>0?"+":"")+r.return_pct+"%":"—";
+    const rc=r.return_pct>0?"var(--up)":r.return_pct<0?"var(--dn)":"var(--tx3)";
+    return `<tr><td><a href="stock.html?s=${r.symbol}" style="font-weight:700">${r.symbol}</a>${r.source==="backfill"?' <span class="simb" title="Simulated replay, not published in advance">SIM</span>':""}</td>
+    <td class="mono" style="color:var(--tx2)">${r.signal_date}</td><td style="color:var(--tx2)">${r.verdict}</td>
+    <td class="r mono">${fmt(r.entry)}</td><td class="r mono" style="color:var(--tx3)">${fmt(r.stop_loss)}</td>
+    <td class="r mono" style="color:var(--tx3)">${fmt(r.tp1)}</td><td class="r mono" style="color:var(--tx3)">${fmt(r.tp2)}</td>
+    <td style="font-weight:700;color:${col}">${lb}</td><td class="r mono" style="font-weight:600;color:${rc}">${ret}</td>
+    <td class="r mono" style="color:var(--tx2)">${r.days??"—"}</td></tr>`}).join("");
+  $("#ledcards").innerHTML=L.map(r=>{
+    const[lb,col]=OC[r.outcome]||[r.outcome,"var(--tx2)"];
+    const ret=r.return_pct!=null?(r.return_pct>0?"+":"")+r.return_pct+"%":"—";
+    const rc=r.return_pct>0?"var(--up)":r.return_pct<0?"var(--dn)":"var(--tx3)";
+    return `<a class="ledcard" href="stock.html?s=${r.symbol}">
+      <div class="lh"><div><span class="ls">${r.symbol}</span>${r.source==="backfill"?' <span class="simb">SIM</span>':""}
+        <div style="font-size:11.5px;color:var(--tx3);margin-top:2px">${r.verdict} · ${r.signal_date}</div></div>
+        <div style="text-align:right"><div style="font-weight:700;color:${col};font-size:13px">${lb}</div>
+        <div class="mono" style="font-weight:700;color:${rc};font-size:14px">${ret}</div></div></div>
+      <div class="lg"><div>Entry<b class="mono">${fmt(r.entry)}</b></div><div>Stop<b class="mono">${fmt(r.stop_loss)}</b></div>
+      <div>TP1<b class="mono">${fmt(r.tp1)}</b></div><div>Days<b class="mono">${r.days??"—"}</b></div></div></a>`}).join("");
+}
+
+/* ---------- equity curve ---------- */
+const PF={port:"#5988f2",bench:"#bd6e8b"};
 let pfData=null,pfWin=30,pfPts=[];
 function initPerf(pf){
-  if(!pf||!pf.series||pf.series.length<2)return;          // old JSON / empty ledger -> card stays hidden
-  pfData=pf;
-  document.getElementById("perf").style.display="block";
-  const spanDays=(new Date(pf.series[pf.series.length-1][0])-new Date(pf.series[0][0]))/864e5;
-  const wins=[["30",30],["90",90],["All",1e5]].filter(([,d])=>d<1e5?spanDays>=d:true);
+  if(!pf||!pf.series||pf.series.length<2)return;
+  pfData=pf;$("#perf").style.display="block";
+  const span=(new Date(pf.series.at(-1)[0])-new Date(pf.series[0][0]))/864e5;
+  const wins=[["30D",30],["90D",90],["All",1e5]].filter(([,d])=>d>=1e5||span>=d);
   pfWin=wins.length>1?30:1e5;
-  document.getElementById("pfwins").innerHTML=wins.map(([l,d])=>
-    `<button class="chip${d===pfWin?" on":""}" data-w="${d}" style="padding:5px 13px;font-size:12px">${l==="All"?"All":l+"D"}</button>`).join(" ");
-  document.getElementById("pfwins").querySelectorAll(".chip").forEach(b=>b.onclick=()=>{
-    pfWin=+b.dataset.w;
-    document.getElementById("pfwins").querySelectorAll(".chip").forEach(x=>x.classList.toggle("on",x===b));
-    drawPerf();});
-  document.getElementById("pflegend").innerHTML=
+  $("#pfwins").innerHTML=wins.map(([l,d])=>`<button class="chip${d===pfWin?" on":""}" data-w="${d}" style="height:36px;padding:0 14px;font-size:12.5px">${l}</button>`).join("");
+  $$("#pfwins .chip").forEach(b=>b.onclick=()=>{pfWin=+b.dataset.w;$$("#pfwins .chip").forEach(x=>x.classList.toggle("on",x===b));drawPerf();});
+  $("#pflegend").innerHTML=
     `<span><i style="display:inline-block;width:18px;height:3px;background:${PF.port};border-radius:2px;vertical-align:middle;margin-right:6px"></i>Following our Buy signals</span>`+
     `<span><i style="display:inline-block;width:18px;height:0;border-top:3px dashed ${PF.bench};vertical-align:middle;margin-right:6px"></i>KSE-100 (just holding the index)</span>`;
-  document.getElementById("pfrules").textContent="Simulation rules: "+pf.rules+
-    " Curve is marked at audited trade close. Shaded region = simulated walk-forward replay (SIM); unshaded = live published signals. "+
-    "Past performance does not guarantee future results — not investment advice.";
+  $("#pfrules").textContent="Simulation rules: "+pf.rules+" Curve is marked at audited trade close. Shaded region = simulated replay (SIM); unshaded = live published signals. Past performance does not guarantee future results — not investment advice.";
   drawPerf();
-  window.addEventListener("resize",()=>pfData&&drawPerf());
+  let rt;window.addEventListener("resize",()=>{clearTimeout(rt);rt=setTimeout(()=>pfData&&drawPerf(),160)});
 }
 function pfSlice(){
-  const s=pfData.series,last=new Date(s[s.length-1][0]);
+  const s=pfData.series,last=new Date(s.at(-1)[0]);
   let pts=pfWin>=1e5?s.slice():s.filter(r=>(last-new Date(r[0]))/864e5<=pfWin);
-  while(pts.length&&pts[0][2]==null)pts=pts.slice(1);      // drop leading points with no benchmark
+  while(pts.length&&pts[0][2]==null)pts=pts.slice(1);
   if(pts.length<2)pts=s.slice(-2);
   const e0=pts[0][1],k0=pts[0][2];
-  return pts.map(r=>[r[0],100000*r[1]/e0,k0&&r[2]!=null?100000*r[2]/k0:null]);
+  return pts.map(r=>[r[0],1e5*r[1]/e0,k0&&r[2]!=null?1e5*r[2]/k0:null]);
 }
 function drawPerf(){
-  pfPts=pfSlice();
-  const pts=pfPts,c=document.getElementById("pfch"),x=c.getContext("2d");
-  const W=c.width=c.offsetWidth*2,H=c.height=520;
+  pfPts=pfSlice();const pts=pfPts,c=$("#pfch"),x=c.getContext("2d");
+  const dpr=Math.min(devicePixelRatio||1,2),cw=c.clientWidth,ch=c.clientHeight;
+  c.width=cw*dpr;c.height=ch*dpr;x.setTransform(dpr,0,0,dpr,0,0);
+  const small=cw<560;
   const vals=pts.flatMap(r=>[r[1],r[2]]).filter(v=>v!=null);
   const lo=Math.min(...vals)*.995,hi=Math.max(...vals)*1.005;
-  const PL=110,PR=30,PT=16,PB=44;
-  const X=i=>PL+(W-PL-PR)*i/(pts.length-1),Y=v=>PT+(H-PT-PB)*(1-(v-lo)/(hi-lo));
-  x.clearRect(0,0,W,H);
-  // SIM shading (before first live-resolved close)
-  const fl=pfData.first_live_close;
-  let simEnd=pts.length-1;
-  if(fl){simEnd=-1;for(let i=0;i<pts.length;i++)if(pts[i][0]<fl)simEnd=i;}
-  if(simEnd>=0){x.fillStyle="rgba(138,92,255,.055)";x.fillRect(X(0),PT,X(Math.min(simEnd+1,pts.length-1))-X(0),H-PT-PB);
-    x.fillStyle="#5a6a8f";x.font="19px Inter";x.fillText("SIM (replay)",X(0)+10,PT+24);}
-  // grid + y labels (recessive)
+  const PL=small?54:74,PR=small?12:16,PT=10,PB=26;
+  const X=i=>PL+(cw-PL-PR)*i/(pts.length-1),Y=v=>PT+(ch-PT-PB)*(1-(v-lo)/(hi-lo));
+  x.clearRect(0,0,cw,ch);
+  const fl=pfData.first_live_close;let se=pts.length-1;
+  if(fl){se=-1;for(let i=0;i<pts.length;i++)if(pts[i][0]<fl)se=i;}
+  if(se>=0){x.fillStyle="rgba(138,92,255,.055)";x.fillRect(X(0),PT,X(Math.min(se+1,pts.length-1))-X(0),ch-PT-PB);
+    x.fillStyle="#5a6a8f";x.font="10px Inter";x.fillText("SIM",X(0)+6,PT+13);}
   x.strokeStyle="#1e2a44";x.lineWidth=1;x.beginPath();
-  for(let g=0;g<5;g++){const y=PT+(H-PT-PB)*g/4;x.moveTo(PL,y);x.lineTo(W-PR,y);}x.stroke();
-  x.fillStyle="#5a6a8f";x.font="19px 'JetBrains Mono',monospace";
-  for(let g=0;g<5;g++)x.fillText("Rs "+fmt(Math.round(hi-(hi-lo)*g/4)),8,PT+6+(H-PT-PB)*g/4);
-  x.font="18px Inter";x.fillText(pts[0][0],PL,H-14);
-  const lastLab=pts[pts.length-1][0];x.fillText(lastLab,W-PR-x.measureText(lastLab).width,H-14);
-  // start baseline (Rs 100k)
-  if(100000>=lo&&100000<=hi){x.setLineDash([3,6]);x.strokeStyle="#2c3d63";x.beginPath();
-    x.moveTo(PL,Y(100000));x.lineTo(W-PR,Y(100000));x.stroke();x.setLineDash([]);}
-  // benchmark (dashed = secondary encoding, not colour-alone)
-  x.setLineDash([10,8]);x.strokeStyle=PF.bench;x.lineWidth=3;x.beginPath();
+  for(let g=0;g<5;g++){const y=PT+(ch-PT-PB)*g/4;x.moveTo(PL,y);x.lineTo(cw-PR,y)}x.stroke();
+  x.fillStyle="#5a6a8f";x.font="10px 'JetBrains Mono',monospace";
+  for(let g=0;g<5;g++){const v=Math.round(hi-(hi-lo)*g/4);x.fillText(small?(v/1000).toFixed(0)+"k":"Rs "+fmt(v),4,PT+4+(ch-PT-PB)*g/4)}
+  x.font="10px Inter";x.fillText(pts[0][0],PL,ch-8);
+  const ll=pts.at(-1)[0];x.fillText(ll,cw-PR-x.measureText(ll).width,ch-8);
+  if(1e5>=lo&&1e5<=hi){x.setLineDash([2,5]);x.strokeStyle="#2c3d63";x.beginPath();x.moveTo(PL,Y(1e5));x.lineTo(cw-PR,Y(1e5));x.stroke();x.setLineDash([])}
+  x.setLineDash([6,5]);x.strokeStyle=PF.bench;x.lineWidth=2;x.beginPath();
   pts.forEach((r,i)=>{if(r[2]==null)return;i&&pts[i-1][2]!=null?x.lineTo(X(i),Y(r[2])):x.moveTo(X(i),Y(r[2]))});
   x.stroke();x.setLineDash([]);
-  // portfolio line + soft area
-  const grad=x.createLinearGradient(0,0,0,H);grad.addColorStop(0,"rgba(89,136,242,.22)");grad.addColorStop(1,"rgba(89,136,242,0)");
+  const gr=x.createLinearGradient(0,0,0,ch);gr.addColorStop(0,"rgba(89,136,242,.22)");gr.addColorStop(1,"rgba(89,136,242,0)");
   x.beginPath();pts.forEach((r,i)=>i?x.lineTo(X(i),Y(r[1])):x.moveTo(X(i),Y(r[1])));
-  x.strokeStyle=PF.port;x.lineWidth=4;x.stroke();
-  x.lineTo(X(pts.length-1),H-PB);x.lineTo(X(0),H-PB);x.closePath();x.fillStyle=grad;x.fill();
-  // direct end labels (text ink + coloured dot)
-  const eEnd=pts[pts.length-1][1],kEnd=pts[pts.length-1][2];
-  const lab=(v,col,dy)=>{if(v==null)return;x.fillStyle=col;x.beginPath();x.arc(X(pts.length-1),Y(v),5,0,7);x.fill();
-    x.fillStyle="#e6ecf7";x.font="bold 19px Inter";const t="Rs "+fmt(Math.round(v));
-    x.fillText(t,Math.min(X(pts.length-1)+10,W-PR-x.measureText(t).width),Y(v)+dy);};
-  lab(eEnd,PF.port,eEnd>= (kEnd??-1e9)?-8:20);lab(kEnd,PF.bench,eEnd>=(kEnd??-1e9)?20:-8);
-  c.style.height="260px";
-  // headline
-  const ep=(eEnd/100000-1)*100,kp=kEnd!=null?(kEnd/100000-1)*100:null;
-  const wlab=pfWin>=1e5?"since tracking began":"last "+pfWin+" days";
-  document.getElementById("pfheadline").innerHTML=
-    `Rs 100,000 → <b style="color:${ep>=0?"var(--up)":"var(--dn)"}" class="mono">Rs ${fmt(Math.round(eEnd))}</b> `+
-    `(${ep>=0?"+":""}${ep.toFixed(2)}%) ${wlab}`+
-    (kp!=null?` · KSE-100 alone: <span class="mono">Rs ${fmt(Math.round(kEnd))}</span> (${kp>=0?"+":""}${kp.toFixed(2)}%)`:"")+
-    ` · <span style="color:var(--tx3)">${pfData.trades} audited trades</span>`;
+  x.strokeStyle=PF.port;x.lineWidth=2.5;x.stroke();
+  x.lineTo(X(pts.length-1),ch-PB);x.lineTo(X(0),ch-PB);x.closePath();x.fillStyle=gr;x.fill();
+  const eE=pts.at(-1)[1],kE=pts.at(-1)[2];
+  [[eE,PF.port],[kE,PF.bench]].forEach(([v,col])=>{if(v==null)return;
+    x.fillStyle=col;x.beginPath();x.arc(X(pts.length-1),Y(v),3.5,0,7);x.fill()});
+  const ep=(eE/1e5-1)*100,kp=kE!=null?(kE/1e5-1)*100:null;
+  const wl=pfWin>=1e5?"since tracking began":"last "+pfWin+" days";
+  $("#pfheadline").innerHTML=`Rs 100,000 → <b class="mono" style="color:${ep>=0?"var(--up)":"var(--dn)"}">Rs ${fmt(Math.round(eE))}</b> (${ep>=0?"+":""}${ep.toFixed(2)}%) ${wl}`+
+    (kp!=null?`<br><span style="color:var(--tx2);font-size:.9em">KSE-100 alone: <span class="mono">Rs ${fmt(Math.round(kE))}</span> (${kp>=0?"+":""}${kp.toFixed(2)}%) · from ${pfData.trades} closed Buy-rated trades</span>`:"");
 }
-// crosshair + tooltip
-(function(){const c=document.getElementById("pfch"),tip=document.getElementById("pftip");if(!c)return;
-c.addEventListener("mousemove",e=>{
-  if(!pfPts.length)return;
-  const r=c.getBoundingClientRect(),fx=(e.clientX-r.left)/r.width;
-  const PL=110/2,PR=30/2,w=r.width-PL-PR;               // css-px equivalents of canvas padding
-  const i=Math.max(0,Math.min(pfPts.length-1,Math.round((e.clientX-r.left-PL)/w*(pfPts.length-1))));
-  const[d,ev,kv]=pfPts[i];
-  tip.style.display="block";
-  tip.style.left=Math.min(e.clientX-r.left+14,r.width-190)+"px";tip.style.top="14px";
+(function(){const c=$("#pfch"),tip=$("#pftip");if(!c)return;
+const show=(cx)=>{if(!pfPts.length)return;
+  const r=c.getBoundingClientRect(),small=r.width<560,PL=small?54:74,PR=small?12:16,w=r.width-PL-PR;
+  const i=Math.max(0,Math.min(pfPts.length-1,Math.round((cx-r.left-PL)/w*(pfPts.length-1))));
+  const[d,ev,kv]=pfPts[i];tip.style.display="block";
+  tip.style.left=Math.max(4,Math.min(cx-r.left+12,r.width-176))+"px";tip.style.top="8px";
   tip.innerHTML=`<b>${d}</b><br><span style="color:${PF.port}">●</span> Signals: Rs ${fmt(Math.round(ev))}`+
-    (kv!=null?`<br><span style="color:${PF.bench}">●</span> KSE-100: Rs ${fmt(Math.round(kv))}`:"");
-});
-c.addEventListener("mouseleave",()=>tip.style.display="none");})();
-document.getElementById("q").addEventListener("input",render);
-document.getElementById("sort").addEventListener("change",render);
-document.querySelectorAll(".chip").forEach(c=>c.onclick=()=>{document.querySelectorAll(".chip").forEach(x=>x.classList.remove("on"));c.classList.add("on");f=c.dataset.f;render();});
+    (kv!=null?`<br><span style="color:${PF.bench}">●</span> KSE-100: Rs ${fmt(Math.round(kv))}`:"");};
+c.addEventListener("mousemove",e=>show(e.clientX));
+c.addEventListener("touchstart",e=>show(e.touches[0].clientX),{passive:true});
+c.addEventListener("touchmove",e=>show(e.touches[0].clientX),{passive:true});
+c.addEventListener("mouseleave",()=>tip.style.display="none");
+c.addEventListener("touchend",()=>setTimeout(()=>tip.style.display="none",1800));})();
 </script></body></html>
