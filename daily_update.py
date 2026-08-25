@@ -23,6 +23,24 @@ CALIB_MIN_COMPONENT = 8  # minimum high-score signals per component to judge it
 CALIB_STEP = 0.05        # weight moved per calibration adjustment
 CALIB_COOLDOWN_DAYS = 7  # min calendar days between weight adjustments
 
+# ---- Trading costs -----------------------------------------------------
+# PSX standard retail brokerage is 0.15% of value or 3 paisa per share,
+# whichever is HIGHER (PSX notice N-1258), plus SST on the commission and
+# CDC/NCCPL charges. Every published return is stated NET of this, because a
+# gross number is not money anyone can actually keep. Raw gross returns stay
+# in the database; costs are applied at presentation so the rate is auditable.
+COST_PCT_PER_SIDE = 0.15      # % of trade value
+COST_MIN_PAISA_PER_SHARE = 3  # absolute floor, hurts low-priced shares most
+COST_TAX_ON_COMMISSION = 0.15 # SST/levies applied to the commission itself
+
+
+def round_trip_cost_pct(price):
+    """Round-trip cost as a % of position value for a share at `price`."""
+    if not price or price <= 0:
+        return 2 * COST_PCT_PER_SIDE * (1 + COST_TAX_ON_COMMISSION)
+    per_side = max(COST_PCT_PER_SIDE, (COST_MIN_PAISA_PER_SHARE / 100.0) / price * 100)
+    return 2 * per_side * (1 + COST_TAX_ON_COMMISSION)
+
 
 def load_shariah():
     """Mirror of the PSX KMI All Share constituents (see shariah.txt header).
@@ -261,7 +279,7 @@ def simulate_portfolio(con, start_capital=100000.0, slot_frac=0.20):
     along for the benchmark line. Purely additive output: returns None if there is
     nothing to plot, and the frontend hides the card in that case."""
     trades = con.execute(
-        "SELECT outcome_date, return_pct, source FROM predictions_history "
+        "SELECT outcome_date, return_pct, source, entry FROM predictions_history "
         "WHERE setup_valid=1 AND verdict IN ('Buy','Strong Buy') "
         "AND outcome IN ('TP1','TP2','SL','EXPIRED') AND return_pct IS NOT NULL "
         "AND outcome_date IS NOT NULL ORDER BY outcome_date").fetchall()
@@ -280,17 +298,72 @@ def simulate_portfolio(con, start_capital=100000.0, slot_frac=0.20):
     eq, i, series, last_k = start_capital, 0, [], None
     for d in dates:
         while i < len(trades) and trades[i][0] <= d:
-            eq *= (1 + slot_frac * float(trades[i][1]) / 100)
+            net = float(trades[i][1]) - round_trip_cost_pct(trades[i][3])   # NET of costs
+            eq *= (1 + slot_frac * net / 100)
             i += 1
         kv = kse.get(d)
         if kv is not None:
             last_k = float(kv)
         series.append([d, round(eq, 2), round(last_k, 2) if last_k else None])
     return {"start_capital": start_capital, "slot_pct": int(slot_frac * 100),
+            "net_of_costs": True,
+            "cost_note": f"Every trade is charged a realistic PSX round trip "
+                         f"({COST_PCT_PER_SIDE}% or {COST_MIN_PAISA_PER_SHARE} paisa/share per side, "
+                         f"whichever is higher, plus {int(COST_TAX_ON_COMMISSION*100)}% tax on commission). "
+                         f"Gross figures would be materially higher and are not achievable.",
             "rules": f"Every Buy/Strong Buy-rated valid setup takes a {int(slot_frac*100)}% "
                      "slot of equity; its audited P/L (incl. losses, expiries, fills) is "
                      "applied at trade close and compounds. No hindsight, no cherry-picking.",
             "first_live_close": first_live, "trades": len(trades), "series": series}
+
+
+def signal_sample(con, portfolio=None):
+    """Evidence the planner needs to state RANGES instead of a fake projection:
+    the actual distribution of Buy-rated trade returns, how often setups appear,
+    the worst peak-to-trough drop, and the best/worst calendar month.
+    Everything here is measured, never modelled."""
+    rows = con.execute(
+        "SELECT signal_date, return_pct, entry FROM predictions_history "
+        "WHERE setup_valid=1 AND verdict IN ('Buy','Strong Buy') "
+        "AND outcome IN ('TP1','TP2','SL','EXPIRED') AND return_pct IS NOT NULL "
+        "ORDER BY signal_date").fetchall()
+    if len(rows) < 10:
+        return None
+    gross = [float(r[1]) for r in rows]
+    rets = [round(float(r[1]) - round_trip_cost_pct(r[2]), 3) for r in rows]   # NET
+    d0, d1 = rows[0][0], rows[-1][0]
+    from datetime import datetime as _dt
+    months = max(0.5, (_dt.strptime(d1, "%Y-%m-%d") - _dt.strptime(d0, "%Y-%m-%d")).days / 30.44)
+    out = {"trades": len(rets), "returns": rets, "from": d0, "to": d1,
+           "net_of_costs": True,
+           "avg_gross_pct": round(sum(gross) / len(gross), 3),
+           "avg_cost_pct": round(sum(gross) / len(gross) - sum(rets) / len(rets), 3),
+           "months_covered": round(months, 1),
+           "trades_per_month": round(len(rets) / months, 2),
+           "win_rate_pct": round(100 * sum(1 for x in rets if x > 0) / len(rets), 1),
+           "avg_return_pct": round(sum(rets) / len(rets), 2),
+           "worst_trade_pct": min(rets), "best_trade_pct": max(rets),
+           "max_drawdown_pct": None, "worst_month_pct": None, "best_month_pct": None,
+           "months": []}
+    if portfolio and portfolio.get("series"):
+        ser = portfolio["series"]
+        peak, dd = ser[0][1], 0.0
+        for _, eq, _k in ser:
+            peak = max(peak, eq)
+            dd = min(dd, (eq / peak - 1) * 100)
+        out["max_drawdown_pct"] = round(dd, 2)
+        by_month = {}
+        for d, eq, _k in ser:
+            by_month.setdefault(d[:7], []).append(eq)
+        ms = []
+        for m in sorted(by_month):
+            v = by_month[m]
+            ms.append({"month": m, "pct": round((v[-1] / v[0] - 1) * 100, 2)})
+        out["months"] = ms
+        if ms:
+            out["worst_month_pct"] = min(x["pct"] for x in ms)
+            out["best_month_pct"] = max(x["pct"] for x in ms)
+    return out
 
 
 def write_track_record(con):
@@ -340,7 +413,8 @@ def write_track_record(con):
              "backfill_note": "Rows marked 'backfill' are a simulated walk-forward replay of the "
                               "engine on historical data — not signals published in advance.",
              "open_signals": open_n,
-             "portfolio": simulate_portfolio(con),
+             "portfolio": (pf := simulate_portfolio(con)),
+             "sample": signal_sample(con, pf),
              "weights": weights, "weights_log": get_calibration(con, "weights_log", [])[-5:],
              "ledger": ledger}
     (OUT / "track_record.json").write_text(json.dumps(track, default=str))
