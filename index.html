@@ -366,7 +366,7 @@ fetch("output/track_record.json").then(r=>{if(!r.ok)throw 0;return r.json()}).th
       Live tracking started 18 Aug 2026; the live record replaces this as trades resolve.</p>`:"");
   const tile=(k,v,sub)=>`<div class="stat"><div class="k">${k}</div><div class="v">${v??"—"}</div>${sub?`<div class="s">${sub}</div>`:""}</div>`;
   $("#trstats").innerHTML=
-    tile(`<span class="tip" data-tip="Only setups on stocks we rated Buy or Strong Buy — the trades we would actually recommend.">Buy signals · 30d</span>`,pc(b30.win_rate_pct),`${b30.wins||0}W / ${b30.losses||0}L of ${b30.trades||0} trades · avg ${pc(b30.avg_return_pct)}`)+
+    tile(`<span class="tip" data-tip="Only setups on stocks we rated Buy or Strong Buy — the trades we would actually recommend. All returns are net of realistic PSX brokerage, the 3-paisa-per-share floor and tax on commission.">Buy signals · 30d</span>`,pc(b30.win_rate_pct),`${b30.wins||0}W / ${b30.losses||0}L of ${b30.trades||0} trades · avg ${pc(b30.avg_return_pct)}`)+
     tile("Buy signals · all time",pc(ball.win_rate_pct),`${ball.trades||0} closed trades from ${ball.signals||0} Buy-rated setups · avg ${pc(ball.avg_return_pct)}`)+
     tile(`<span class="tip" data-tip="Every setup that passed the 1:2 risk-reward rule, including ones on stocks we rated Hold or Sell. Shown for full transparency.">All valid setups · 30d</span>`,pc(s30.win_rate_pct),`${s30.wins||0}W / ${s30.losses||0}L of ${s30.trades||0} trades`)+
     tile("All valid setups · all time",pc(all.win_rate_pct),`${all.trades} closed trades from ${all.signals} setups, incl. Hold/Sell · avg ${pc(all.avg_return_pct)}`)+
@@ -421,7 +421,8 @@ function initPerf(pf){
   pfData=pf;$("#perf").style.display="block";
   const span=(new Date(pf.series.at(-1)[0])-new Date(pf.series[0][0]))/864e5;
   const wins=[["30D",30],["90D",90],["All",1e5]].filter(([,d])=>d>=1e5||span>=d);
-  pfWin=wins.length>1?30:1e5;
+  pfWin=1e5;   // default to the FULL record — a 30-day window on a multi-year
+               // history flatters by selection, which is the failure this page exists to avoid.
   $("#pfwins").innerHTML=wins.map(([l,d])=>`<button class="chip${d===pfWin?" on":""}" data-w="${d}" style="height:36px;padding:0 14px;font-size:12.5px">${l}</button>`).join("");
   $$("#pfwins .chip").forEach(b=>b.onclick=()=>{pfWin=+b.dataset.w;$$("#pfwins .chip").forEach(x=>x.classList.toggle("on",x===b));drawPerf();});
   $("#pflegend").innerHTML=
@@ -434,10 +435,15 @@ function initPerf(pf){
 function pfSlice(){
   const s=pfData.series,last=new Date(s.at(-1)[0]);
   let pts=pfWin>=1e5?s.slice():s.filter(r=>(last-new Date(r[0]))/864e5<=pfWin);
-  while(pts.length&&pts[0][2]==null)pts=pts.slice(1);
   if(pts.length<2)pts=s.slice(-2);
-  const e0=pts[0][1],k0=pts[0][2];
-  return pts.map(r=>[r[0],1e5*r[1]/e0,k0&&r[2]!=null?1e5*r[2]/k0:null]);
+  const e0=pts[0][1];
+  // Benchmark history can start later than ours. Rather than truncating our own
+  // record to match (which would hide the earlier period and contradict the
+  // headline figure), keep the full curve and rebase the index to OUR equity at
+  // the first date it exists — so from that point the two are directly comparable.
+  const kFirst=pts.find(r=>r[2]!=null);
+  const k0=kFirst?kFirst[2]:null, base=kFirst?1e5*kFirst[1]/e0:1e5;
+  return pts.map(r=>[r[0],1e5*r[1]/e0,(k0&&r[2]!=null)?base*r[2]/k0:null]);
 }
 function drawPerf(){
   pfPts=pfSlice();const pts=pfPts,c=$("#pfch"),x=c.getContext("2d");
@@ -470,10 +476,14 @@ function drawPerf(){
   const eE=pts.at(-1)[1],kE=pts.at(-1)[2];
   [[eE,PF.port],[kE,PF.bench]].forEach(([v,col])=>{if(v==null)return;
     x.fillStyle=col;x.beginPath();x.arc(X(pts.length-1),Y(v),3.5,0,7);x.fill()});
-  const ep=(eE/1e5-1)*100,kp=kE!=null?(kE/1e5-1)*100:null;
+  const ep=(eE/1e5-1)*100;
+  // index return measured on RAW index values inside the visible window
+  const raw=pfData.series.filter(r=>pts.some(q=>q[0]===r[0])&&r[2]!=null);
+  const kp=raw.length>1?(raw.at(-1)[2]/raw[0][2]-1)*100:null;
+  const kFrom=raw.length?raw[0][0]:null;
   const wl=pfWin>=1e5?"since tracking began":"last "+pfWin+" days";
   $("#pfheadline").innerHTML=`Rs 100,000 → <b class="mono" style="color:${ep>=0?"var(--up)":"var(--dn)"}">Rs ${fmt(Math.round(eE))}</b> (${ep>=0?"+":""}${ep.toFixed(2)}%) ${wl}`+
-    (kp!=null?`<br><span style="color:var(--tx2);font-size:.9em">KSE-100 alone: <span class="mono">Rs ${fmt(Math.round(kE))}</span> (${kp>=0?"+":""}${kp.toFixed(2)}%) · from ${pfData.trades} closed Buy-rated trades</span>`:"");
+    (kp!=null?`<br><span style="color:var(--tx2);font-size:.9em">KSE-100 over the same period: <b style="color:${kp>=0?"var(--up)":"var(--dn)"}">${kp>=0?"+":""}${kp.toFixed(2)}%</b>${kFrom&&pfWin>=1e5?` (index data from ${kFrom})`:""} · ${pfData.trades} closed Buy-rated trades</span>`:"");
 }
 (function(){const c=$("#pfch"),tip=$("#pftip");if(!c)return;
 const show=(cx)=>{if(!pfPts.length)return;

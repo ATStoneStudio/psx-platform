@@ -110,12 +110,14 @@ def _psx_index(code="KSE100", n=10):
 
 def fetch_macro():
     """Each series tries multiple sources; failure of one never blocks the rest.
-    Depth: 60d for Brent/USDPKR trend windows; 400d KSE-100 so the 50-EMA
-    regime filter works from day one instead of after 50 daily runs."""
+    Depth: 60d for Brent/USDPKR trend windows; up to 1500d KSE-100 so the 50-EMA
+    regime filter works from day one AND the benchmark covers the audited record."""
     con = sqlite3.connect(DB)
     plans = {"brent": [lambda: _stooq("cb.f", 60), lambda: _yahoo("BZ=F", "3mo", 60)],
              "usdpkr": [lambda: _stooq("usdpkr", 60), lambda: _yahoo("PKR=X", "3mo", 60)],
-             "kse100": [lambda: _psx_index("KSE100", 400), lambda: _stooq("^kse", 400)]}
+             # deep KSE-100 history so the benchmark line spans the whole audited
+             # record; if a source returns less, we simply store what we get
+             "kse100": [lambda: _psx_index("KSE100", 1500), lambda: _stooq("^kse", 1500)]}
     for name, sources in plans.items():
         for fn in sources:
             try:
@@ -370,17 +372,20 @@ def write_track_record(con):
     """Public, transparent ledger -> output/track_record.json (index.html)."""
     def bucket(where=""):
         rows = con.execute(
-            "SELECT outcome, return_pct, days_to_outcome FROM predictions_history "
+            "SELECT outcome, return_pct, days_to_outcome, entry FROM predictions_history "
             f"WHERE setup_valid=1 AND outcome IS NOT NULL {where}").fetchall()
         played = [r for r in rows if r[0] in ("TP1", "TP2", "SL", "EXPIRED")]
         wins = [r for r in played if r[0] in ("TP1", "TP2")]
-        rets = [r[1] for r in played if r[1] is not None]
+        # NET of trading costs — must match the equity curve and the sample,
+        # otherwise the page contradicts itself.
+        rets = [r[1] - round_trip_cost_pct(r[3]) for r in played if r[1] is not None]
         return {"signals": len(rows), "trades": len(played), "wins": len(wins),
                 "losses": sum(1 for r in played if r[0] == "SL"),
                 "expired": sum(1 for r in played if r[0] == "EXPIRED"),
                 "not_filled": sum(1 for r in rows if r[0] == "NOT_FILLED"),
                 "win_rate_pct": round(100 * len(wins) / len(played), 1) if played else None,
                 "avg_return_pct": round(sum(rets) / len(rets), 2) if rets else None,
+                "returns_net_of_costs": True,
                 "avg_days_to_win": (round(sum(r[2] for r in wins if r[2] is not None)
                                           / max(1, len([r for r in wins if r[2] is not None])), 1)
                                     if wins else None)}
